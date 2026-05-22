@@ -1,36 +1,204 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WorldBet 26 - Plataforma de Bolao da Copa 2026
 
-## Getting Started
+Plataforma web para bolao da Copa do Mundo 2026, com foco em:
+- cadastro/login de usuarios,
+- palpites por partida,
+- fechamento automatico de palpites por horario,
+- ranking com pontuacao detalhada,
+- painel admin para gestao de jogos e importacao CSV.
 
-First, run the development server:
+## 1. Stack Tecnologica
+
+- `Next.js 16` (App Router)
+- `React 19`
+- `TypeScript`
+- `Tailwind CSS 4`
+- `Framer Motion`
+- `Supabase` (Auth + Postgres)
+- `PostgreSQL` local opcional (via Docker)
+- `SQLite` local (fallback de desenvolvimento)
+- `Vitest` (testes de regra)
+
+## 2. Como a Aplicacao Foi Estruturada
+
+## 2.1 Arquitetura (MVC adaptada para Next.js App Router)
+
+Nao e MVC classico de framework backend, mas o mapeamento funcional fica assim:
+
+- `Model`:
+  - Tipos e entidades em `src/lib/types.ts`
+  - Regras de negocio e pontuacao em `src/lib/scoring.ts`
+  - Persistencia em `src/lib/local-db.ts`, `src/lib/postgres-db.ts`, `src/lib/data.ts`
+
+- `View`:
+  - Pags e layout em `src/app/**/page.tsx`
+  - Componentes de interface em `src/components/**`
+
+- `Controller`:
+  - Server Actions em paginas (ex.: admin/configuracoes)
+  - Route Handlers da API local em `src/app/api/**/route.ts`
+  - Guards de autenticacao em `src/lib/auth-guard.ts`
+
+## 2.2 Estrutura de Pastas (resumo)
+
+```txt
+src/
+  app/
+    admin/                # Painel admin + server actions
+    api/                  # Rotas locais (auth e palpites)
+    configuracoes/
+    jogos/
+    login/
+    palpites/
+    perfil/
+    ranking/
+  components/             # UI reutilizavel e boards
+  lib/
+    app-db.ts             # Orquestra local sqlite/postgres
+    data.ts               # Leitura de dados (supabase/local)
+    local-db.ts           # Persistencia sqlite
+    postgres-db.ts        # Persistencia postgres
+    scoring.ts            # Regras de pontuacao
+    match-csv.ts          # Parser/validador CSV de jogos
+    supabase-*.ts         # Clientes/env do Supabase
+supabase/
+  schema.sql              # Schema oficial para Supabase cloud
+  local-postgres.sql      # Bootstrap para Postgres local
+  seed.sql                # Seed opcional de exemplo
+```
+
+## 3. Funcionalidades Implementadas
+
+- Dashboard com resumo da competicao
+- Pagina de jogos com filtros (fase, grupo, rodada, status) e paginacao
+- Pagina de palpites com filtros (status, grupo, rodada), cards uniformes e paginacao
+- Bloqueio automatico de palpite por horario e/ou fechamento admin
+- Ranking geral com criterios de desempate
+- Configuracoes de conta (usuario/senha) com feedback visual
+- Painel admin:
+  - cadastro manual de jogo,
+  - encerramento/reabertura de partida,
+  - gestao de usuarios (admin/ativo),
+  - importacao em lote de jogos via CSV (`match_number` + `round_number`)
+
+## 4. Regras de Negocio
+
+## 4.1 Bloqueio de Palpites
+
+Um palpite fica bloqueado quando:
+- `match.isClosed = true`, ou
+- `kickoffAt <= agora`.
+
+## 4.2 Pontuacao
+
+- `10 pontos`: placar exato
+- `7 pontos`: vencedor correto + diferenca de gols (sem empate)
+- `5 pontos`: resultado correto (vitoria/empate/derrota)
+- `1 ponto`: acerto de gols de um dos times
+- `0`: sem acerto
+
+Implementado em `src/lib/scoring.ts`.
+
+## 5. Modos de Banco (Storage Mode)
+
+A aplicacao escolhe o modo automaticamente:
+
+1. `supabase` se `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` existirem
+2. `postgres` se `DATABASE_URL` existir e Supabase nao estiver configurado
+3. `sqlite` fallback local
+
+Arquivo de decisao: `src/lib/storage-mode.ts`.
+
+## 6. Variaveis de Ambiente
+
+Base em `.env.example`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+DATABASE_URL=
+DATABASE_SSL=false
+```
+
+## 7. Executando Localmente
+
+## 7.1 Modo simples (SQLite)
+
+```bash
+npm install
+npm run dev
+```
+
+## 7.2 Modo PostgreSQL local (Docker)
+
+1. Copie `.env.docker.example` para `.env.docker` (opcional).
+2. Suba o container:
+
+```bash
+docker compose --env-file .env.docker up -d
+```
+
+3. Configure `.env.local` com `DATABASE_URL`.
+4. Rode:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 7.3 Modo Supabase
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Crie projeto no Supabase.
+2. Rode `supabase/schema.sql` no SQL Editor.
+3. Configure no `.env.local`:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. Rode `npm run dev`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 8. Deploy (GitHub -> Vercel -> Supabase)
 
-## Learn More
+## 8.1 GitHub
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+git remote add origin https://github.com/SEU_USUARIO/SEU_REPO.git
+git push -u origin master
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 8.2 Vercel
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Importar repositorio no painel da Vercel
+- Configurar variaveis:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Deploy
 
-## Deploy on Vercel
+## 8.3 Supabase
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Rodar `supabase/schema.sql`
+- Configurar Auth:
+  - `Site URL` de producao
+  - Redirect URLs (localhost + Vercel preview/prod)
+- Promover primeiro admin:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```sql
+update public.profiles
+set is_admin = true
+where username = 'seu_usuario';
+```
+
+## 9. Scripts
+
+```bash
+npm run dev
+npm run lint
+npm run test
+npm run build
+npm run start
+```
+
+## 10. Observacoes de Seguranca
+
+- Nenhuma chave real foi commitada no repositorio.
+- `.env*` e `supabase/local.sqlite*` estao no `.gitignore`.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` e publica por definicao do Supabase (nao e service role).
+- Em modo local/postgres existe conta seed para desenvolvimento e deve ser alterada em ambientes reais.
+- Recomenda-se adicionar rate limit nas rotas locais de login/signup se esse modo for exposto publicamente.
