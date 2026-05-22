@@ -1,65 +1,118 @@
-import Image from "next/image";
+import { AppShell } from "@/components/app-shell";
+import { MatchCard } from "@/components/match-card";
+import { Badge } from "@/components/ui/badge";
+import { Surface } from "@/components/ui/surface";
+import { requireAuthenticatedViewer } from "@/lib/auth-guard";
+import { getDashboardSummary } from "@/lib/data";
 
-export default function Home() {
+function StatCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  tone: "upcoming" | "finished" | "champion";
+}) {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <Surface className="p-4">
+      <p className="text-xs uppercase tracking-wide text-slate-300">{label}</p>
+      <p className="font-display text-5xl leading-none tracking-[0.08em] text-white">
+        {value}
+      </p>
+      <div className="mt-2">
+        <Badge tone={tone}>
+          {tone === "champion"
+            ? "Elite"
+            : tone === "finished"
+              ? "Concluído"
+              : "Programado"}
+        </Badge>
+      </div>
+    </Surface>
+  );
+}
+
+export default async function DashboardPage() {
+  const viewer = await requireAuthenticatedViewer();
+  const summary = await getDashboardSummary();
+
+  return (
+    <AppShell
+      title="WorldBet 26"
+      subtitle="Centro de comando premium para palpites, jogos e corrida pelo topo do ranking"
+      viewer={viewer}
+    >
+      <section className="grid gap-4 md:grid-cols-3">
+        <StatCard label="Jogos cadastrados" value={summary.totalMatches} tone="upcoming" />
+        <StatCard
+          label="Jogos finalizados"
+          value={summary.finishedMatches}
+          tone="finished"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+        <StatCard
+          label="Top participantes"
+          value={summary.topParticipants.length}
+          tone="champion"
+        />
+      </section>
+
+      <section className="mt-6 grid gap-6 xl:grid-cols-[1.65fr_1fr]">
+        <div className="space-y-3">
+          <h2 className="font-display text-2xl uppercase tracking-[0.09em]">
+            Próximas partidas
+          </h2>
+          {summary.upcomingMatches.length === 0 ? (
+            <Surface className="p-6 text-center">
+              <p className="text-lg font-semibold text-slate-100">Agenda concluída</p>
+              <p className="text-sm text-slate-300">
+                No momento não há partidas futuras cadastradas.
+              </p>
+            </Surface>
+          ) : (
+            <div className="grid gap-4">
+              {summary.upcomingMatches.map((match, index) => (
+                <MatchCard key={match.id} match={match} featured={index === 0} />
+              ))}
+            </div>
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="space-y-3">
+          <h2 className="font-display text-2xl uppercase tracking-[0.09em]">Top ranking</h2>
+          <Surface className="p-4">
+            {summary.topParticipants.length === 0 ? (
+              <p className="text-sm text-slate-300">Ainda sem pontuação consolidada.</p>
+            ) : (
+              <ol className="space-y-2">
+                {summary.topParticipants.map((participant, index) => (
+                  <li
+                    key={participant.userId}
+                    className="flex items-center justify-between rounded-xl border border-white/8 bg-white/5 px-3 py-2"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-display text-2xl leading-none text-white/85">
+                        {index + 1}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-100">
+                          {participant.displayName}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {participant.exactScores} placares exatos
+                        </p>
+                      </div>
+                    </div>
+                    <Badge tone={index === 0 ? "champion" : "upcoming"}>
+                      {participant.totalPoints} pts
+                    </Badge>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Surface>
         </div>
-      </main>
-    </div>
+      </section>
+    </AppShell>
   );
 }
