@@ -3,15 +3,16 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { FiAward, FiCalendar, FiMapPin, FiMinus, FiPlus, FiSave, FiUsers } from "react-icons/fi";
-import { isMatchFinished, isPredictionLocked } from "@/lib/scoring";
-import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { TeamPill } from "@/components/team-pill";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/field";
 import { Surface } from "@/components/ui/surface";
 import { ToastStack, type ToastItem, type ToastKind } from "@/components/ui/toast-stack";
-import type { Match, MatchOutcome, Prediction, Viewer } from "@/lib/types";
+import { STAGE_LABEL } from "@/lib/match-ui";
+import { isMatchFinished, isPredictionLocked } from "@/lib/scoring";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import type { Match, Prediction, Viewer } from "@/lib/types";
 
 interface PredictionBoardProps {
   matches: Match[];
@@ -45,24 +46,9 @@ function buildDrafts(predictions: Record<string, Prediction>): Record<string, Lo
   return drafts;
 }
 
-function outcomeFromDraft(draft: LocalDraft | undefined): MatchOutcome | null {
-  if (!draft) {
-    return null;
-  }
-  const home = Number(draft.homeGoals);
-  const away = Number(draft.awayGoals);
-  if (!Number.isInteger(home) || !Number.isInteger(away)) {
-    return null;
-  }
-  if (home === away) {
-    return "draw";
-  }
-  return home > away ? "home" : "away";
-}
-
 function formatKickoffDate(value: string): string {
   return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
+    dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
 }
@@ -73,6 +59,53 @@ function toDisplayGoals(value: string | undefined): number {
     return 0;
   }
   return parsed;
+}
+
+interface GoalControlProps {
+  label: string;
+  value: number;
+  locked: boolean;
+  align?: "left" | "right";
+  onDecrease: () => void;
+  onIncrease: () => void;
+}
+
+function GoalControl({
+  label,
+  value,
+  locked,
+  align = "left",
+  onDecrease,
+  onIncrease,
+}: GoalControlProps) {
+  return (
+    <div className={align === "right" ? "md:text-right" : undefined}>
+      <p className="mb-1 text-xs uppercase tracking-wide text-slate-300">Gols</p>
+      <div className="inline-flex h-10 w-full items-center overflow-hidden rounded-xl border border-blue-300/35 bg-[rgba(8,26,53,0.9)] sm:w-[210px]">
+        <button
+          type="button"
+          disabled={locked}
+          onClick={onDecrease}
+          className="flex h-full w-12 items-center justify-center border-r border-white/10 text-2xl text-blue-300 transition hover:bg-white/5 disabled:opacity-40"
+          aria-label={`Diminuir gols de ${label}`}
+        >
+          <FiMinus />
+        </button>
+        <span className="flex-1 text-center font-display text-3xl leading-none text-white">
+          {value}
+        </span>
+        <button
+          type="button"
+          disabled={locked}
+          onClick={onIncrease}
+          className="flex h-full w-12 items-center justify-center border-l border-white/10 text-2xl text-blue-300 transition hover:bg-white/5 disabled:opacity-40"
+          aria-label={`Aumentar gols de ${label}`}
+        >
+          <FiPlus />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function PredictionBoard({
@@ -95,9 +128,10 @@ export function PredictionBoard({
   const [page, setPage] = useState(1);
 
   const orderedMatches = useMemo(() => {
-    return [...matches].sort((left, right) => {
-      return new Date(left.kickoffAt).getTime() - new Date(right.kickoffAt).getTime();
-    });
+    return [...matches].sort(
+      (left, right) =>
+        new Date(left.kickoffAt).getTime() - new Date(right.kickoffAt).getTime(),
+    );
   }, [matches]);
 
   const filteredMatches = useMemo(() => {
@@ -188,32 +222,6 @@ export function PredictionBoard({
     const parsed = toDisplayGoals(currentValue);
     const next = Math.max(0, parsed + delta);
     setDraftValue(matchId, field, String(next));
-  }
-
-  function chooseOutcome(match: Match, outcome: MatchOutcome) {
-    const current = drafts[match.id] ?? { homeGoals: "0", awayGoals: "0" };
-    const home = toDisplayGoals(current.homeGoals);
-    const away = toDisplayGoals(current.awayGoals);
-
-    if (outcome === "draw") {
-      const score = Math.max(home, away, 1);
-      setDraftValue(match.id, "homeGoals", String(score));
-      setDraftValue(match.id, "awayGoals", String(score));
-      return;
-    }
-
-    if (outcome === "home") {
-      const nextHome = Math.max(home, away + 1, 1);
-      const nextAway = Math.min(away, nextHome - 1);
-      setDraftValue(match.id, "homeGoals", String(nextHome));
-      setDraftValue(match.id, "awayGoals", String(nextAway));
-      return;
-    }
-
-    const nextAway = Math.max(away, home + 1, 1);
-    const nextHome = Math.min(home, nextAway - 1);
-    setDraftValue(match.id, "awayGoals", String(nextAway));
-    setDraftValue(match.id, "homeGoals", String(nextHome));
   }
 
   async function savePrediction(match: Match) {
@@ -428,9 +436,9 @@ export function PredictionBoard({
             </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             {paginatedMatches.length === 0 ? (
-              <Surface className="p-6 text-center">
+              <Surface className="p-6 text-center lg:col-span-2">
                 <p className="text-sm text-slate-300">
                   Nenhum jogo encontrado para o filtro selecionado.
                 </p>
@@ -440,7 +448,6 @@ export function PredictionBoard({
                 const finished = isMatchFinished(match);
                 const locked = isPredictionLocked(match);
                 const draft = drafts[match.id] ?? { homeGoals: "0", awayGoals: "0" };
-                const draftOutcome = outcomeFromDraft(draft);
                 const homeGoals = toDisplayGoals(draft.homeGoals);
                 const awayGoals = toDisplayGoals(draft.awayGoals);
 
@@ -453,177 +460,104 @@ export function PredictionBoard({
                   >
                     <Surface className="relative overflow-hidden border-blue-300/35 p-4 md:p-5">
                       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(29,78,216,0.25),transparent_42%),radial-gradient(circle_at_85%_92%,rgba(29,78,216,0.18),transparent_42%)]" />
-                      <div className="relative z-10 space-y-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge
-                              tone={
-                                finished ? "game_finished" : locked ? "bet_closed" : "bet_open"
-                              }
-                            >
-                              {finished
-                                ? "Jogo finalizado"
-                                : locked
-                                  ? "Palpites fechados"
-                                  : "Palpites em aberto"}
-                            </Badge>
 
-                            <span className="inline-flex items-center gap-1 rounded-2xl border border-white/15 bg-blue-500/15 px-3 py-1 text-sm font-semibold text-slate-100">
-                              <FiCalendar className="text-sm text-blue-200" />
-                              {formatKickoffDate(match.kickoffAt)}
+                      <div className="relative z-10 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Badge
+                            tone={
+                              finished ? "game_finished" : locked ? "bet_closed" : "bet_open"
+                            }
+                          >
+                            {finished
+                              ? "Jogo finalizado"
+                              : locked
+                                ? "Palpites fechados"
+                                : "Palpites em aberto"}
+                          </Badge>
+                          <span className="rounded-xl border border-white/12 bg-black/20 px-3 py-1 text-sm text-slate-200">
+                            {locked ? "Fechado" : "Aberto"}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-200">
+                          <span className="inline-flex items-center gap-1.5">
+                            <FiCalendar className="text-base text-blue-200" />
+                            {formatKickoffDate(match.kickoffAt)}
+                          </span>
+                          <span className="inline-flex items-center gap-1.5">
+                            <FiMapPin className="text-base text-blue-200" />
+                            {match.venue ?? "Estadio a definir"}
+                          </span>
+                        </div>
+
+                        <div className="h-px bg-white/12" />
+
+                        <div className="grid items-center gap-3 grid-cols-[1fr_auto_1fr]">
+                          <div className="space-y-2">
+                            <TeamPill teamName={match.homeTeam} variant="feature" />
+                            <GoalControl
+                              label={match.homeTeam}
+                              value={homeGoals}
+                              locked={locked}
+                              onDecrease={() => adjustDraftValue(match.id, "homeGoals", -1)}
+                              onIncrease={() => adjustDraftValue(match.id, "homeGoals", 1)}
+                            />
+                          </div>
+
+                          <div className="flex flex-col items-center justify-center">
+                            <span className="h-10 w-px bg-white/15 md:h-14" />
+                            <span className="my-1 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-blue-300/35 bg-[rgba(8,26,53,0.95)] font-display text-4xl leading-none text-white md:h-14 md:w-14">
+                              VS
                             </span>
+                            <span className="h-10 w-px bg-white/15 md:h-14" />
+                          </div>
 
+                          <div className="space-y-2">
+                            <TeamPill
+                              teamName={match.awayTeam}
+                              variant="feature"
+                              align="right"
+                              className="justify-end"
+                            />
+                            <GoalControl
+                              label={match.awayTeam}
+                              value={awayGoals}
+                              locked={locked}
+                              align="right"
+                              onDecrease={() => adjustDraftValue(match.id, "awayGoals", -1)}
+                              onIncrease={() => adjustDraftValue(match.id, "awayGoals", 1)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2 border-t border-white/12 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="text-sm text-slate-300">
+                            <span>{STAGE_LABEL[match.stage]}</span>
                             {match.groupName ? (
-                              <span className="inline-flex items-center gap-1 rounded-2xl border border-white/15 bg-blue-500/12 px-3 py-1 text-sm font-semibold text-slate-100">
+                              <span className="inline-flex items-center gap-1 pl-2">
                                 <FiUsers className="text-sm text-blue-200" />
                                 Grupo {match.groupName}
                               </span>
                             ) : null}
-
                             {typeof match.roundNumber === "number" ? (
-                              <span className="inline-flex items-center gap-1 rounded-2xl border border-white/15 bg-blue-500/12 px-3 py-1 text-sm font-semibold text-slate-100">
+                              <span className="inline-flex items-center gap-1 pl-2">
                                 <FiAward className="text-sm text-blue-200" />
                                 Rodada {match.roundNumber}
                               </span>
                             ) : null}
                           </div>
 
-                          <p className="flex items-center gap-1 text-sm text-slate-300">
-                            <FiMapPin className="text-sm text-slate-400" />
-                            {match.venue ?? "Estadio a definir"}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-white/12 bg-[linear-gradient(145deg,rgba(8,25,52,0.86),rgba(8,20,43,0.95))] p-3 md:p-4">
-                          <div className="grid gap-3">
-                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-                              <TeamPill teamName={match.homeTeam} variant="feature" className="flex-1" />
-                              <div className="w-full sm:w-auto">
-                                <p className="mb-1 text-xs uppercase tracking-wide text-slate-300 sm:text-right">
-                                  Gols
-                                </p>
-                                <div className="inline-flex h-12 w-full items-center overflow-hidden rounded-xl border border-blue-300/35 bg-[rgba(8,26,53,0.9)] sm:w-[220px]">
-                                  <button
-                                    type="button"
-                                    disabled={locked}
-                                    onClick={() => adjustDraftValue(match.id, "homeGoals", -1)}
-                                    className="flex h-full w-14 items-center justify-center border-r border-white/10 text-2xl text-blue-300 transition hover:bg-white/5 disabled:opacity-40"
-                                  >
-                                    <FiMinus />
-                                  </button>
-                                  <span className="flex-1 text-center font-display text-4xl leading-none text-white">
-                                    {homeGoals}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    disabled={locked}
-                                    onClick={() => adjustDraftValue(match.id, "homeGoals", 1)}
-                                    className="flex h-full w-14 items-center justify-center border-l border-white/10 text-2xl text-blue-300 transition hover:bg-white/5 disabled:opacity-40"
-                                  >
-                                    <FiPlus />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-1">
-                              <span className="h-[2px] w-full bg-[radial-gradient(circle,rgba(29,78,216,0.7)_1.2px,transparent_1.2px)] [background-size:12px_2px]" />
-                              <span className="rounded-[1.2rem] border border-blue-300/40 bg-[linear-gradient(145deg,rgba(10,31,67,0.95),rgba(8,20,44,0.98))] px-5 py-2 font-display text-5xl leading-none text-white shadow-[0_12px_30px_rgba(10,24,47,0.45)]">
-                                VS
-                              </span>
-                              <span className="h-[2px] w-full bg-[radial-gradient(circle,rgba(29,78,216,0.7)_1.2px,transparent_1.2px)] [background-size:12px_2px]" />
-                            </div>
-
-                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-                              <TeamPill teamName={match.awayTeam} variant="feature" className="flex-1" />
-                              <div className="w-full sm:w-auto">
-                                <p className="mb-1 text-xs uppercase tracking-wide text-slate-300 sm:text-right">
-                                  Gols
-                                </p>
-                                <div className="inline-flex h-12 w-full items-center overflow-hidden rounded-xl border border-blue-300/35 bg-[rgba(8,26,53,0.9)] sm:w-[220px]">
-                                  <button
-                                    type="button"
-                                    disabled={locked}
-                                    onClick={() => adjustDraftValue(match.id, "awayGoals", -1)}
-                                    className="flex h-full w-14 items-center justify-center border-r border-white/10 text-2xl text-blue-300 transition hover:bg-white/5 disabled:opacity-40"
-                                  >
-                                    <FiMinus />
-                                  </button>
-                                  <span className="flex-1 text-center font-display text-4xl leading-none text-white">
-                                    {awayGoals}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    disabled={locked}
-                                    onClick={() => adjustDraftValue(match.id, "awayGoals", 1)}
-                                    className="flex h-full w-14 items-center justify-center border-l border-white/10 text-2xl text-blue-300 transition hover:bg-white/5 disabled:opacity-40"
-                                  >
-                                    <FiPlus />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-2 md:grid-cols-3">
-                          <button
+                          <Button
                             type="button"
-                            disabled={locked}
-                            onClick={() => chooseOutcome(match, "home")}
-                            className={`rounded-xl border px-4 py-3 text-base font-semibold transition ${
-                              draftOutcome === "home"
-                                ? "border-blue-300/70 bg-blue-500/25 text-blue-100"
-                                : "border-white/12 bg-white/5 text-slate-200 hover:bg-white/10"
-                            }`}
+                            size="sm"
+                            disabled={locked || savingMatchId === match.id}
+                            onClick={() => void savePrediction(match)}
+                            className="h-10 w-full px-4 text-[1.9rem] sm:w-auto sm:text-base"
                           >
-                            <span className="inline-flex items-center gap-2">
-                              <FiAward className="text-lg text-blue-300" />
-                              Vitoria {match.homeTeam}
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            disabled={locked}
-                            onClick={() => chooseOutcome(match, "draw")}
-                            className={`rounded-xl border px-4 py-3 text-base font-semibold transition ${
-                              draftOutcome === "draw"
-                                ? "border-amber-300/75 bg-amber-500/22 text-amber-100"
-                                : "border-white/12 bg-white/5 text-slate-200 hover:bg-white/10"
-                            }`}
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              <FiAward className="text-lg text-amber-300" />
-                              Empate
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            disabled={locked}
-                            onClick={() => chooseOutcome(match, "away")}
-                            className={`rounded-xl border px-4 py-3 text-base font-semibold transition ${
-                              draftOutcome === "away"
-                                ? "border-green-300/70 bg-green-500/22 text-green-100"
-                                : "border-white/12 bg-white/5 text-slate-200 hover:bg-white/10"
-                            }`}
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              <FiAward className="text-lg text-blue-300" />
-                              Vitoria {match.awayTeam}
-                            </span>
-                          </button>
+                            <FiSave className="text-xl sm:text-base" />
+                            {savingMatchId === match.id ? "Salvando..." : "Salvar palpite"}
+                          </Button>
                         </div>
-
-                        <Button
-                          type="button"
-                          size="lg"
-                          disabled={locked || savingMatchId === match.id}
-                          onClick={() => void savePrediction(match)}
-                          className="h-14 w-full text-2xl"
-                        >
-                          <FiSave className="text-2xl" />
-                          {savingMatchId === match.id ? "Salvando..." : "Salvar palpite"}
-                        </Button>
                       </div>
                     </Surface>
                   </motion.article>
@@ -704,7 +638,7 @@ export function PredictionBoard({
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                       <TeamPill teamName={match.homeTeam} />
                       <span className="font-display text-2xl">
-                        {prediction?.homeGoals ?? "-"} × {prediction?.awayGoals ?? "-"}
+                        {prediction?.homeGoals ?? "-"} x {prediction?.awayGoals ?? "-"}
                       </span>
                       <TeamPill teamName={match.awayTeam} align="right" />
                     </div>
