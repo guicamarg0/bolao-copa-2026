@@ -428,7 +428,7 @@ export function PredictionBoard({
             </div>
           </div>
 
-          <div className="grid gap-4">
+          <div className="grid gap-4 xl:grid-cols-2">
             {paginatedMatches.length === 0 ? (
               <Surface className="p-6 text-center">
                 <p className="text-sm text-slate-300">

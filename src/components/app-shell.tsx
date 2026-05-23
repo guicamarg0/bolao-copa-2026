@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { LogoutButton } from "@/components/logout-button";
 import { ShellNav, type ShellNavItem } from "@/components/shell-nav";
 import { getStorageMode } from "@/lib/storage-mode";
 import type { Viewer } from "@/lib/types";
@@ -41,40 +39,26 @@ export function AppShell({ title, subtitle, viewer, children }: AppShellProps) {
 
       <ShellNav
         items={visibleNavItems}
+        viewerId={viewer?.id}
         viewerName={viewer?.displayName}
         modeLabel={modeLabel}
       />
 
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-30 border-b border-white/10 bg-[rgba(9,20,39,0.75)] backdrop-blur-xl">
+        <header className="sticky top-0 z-30 hidden border-b border-white/10 bg-[rgba(9,20,39,0.75)] backdrop-blur-xl md:block">
           <div className="mx-auto w-full max-w-[1600px] px-4 pb-4 pt-5 pl-16 md:px-7 md:pl-16 lg:pl-7">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h1 className="font-display text-2xl uppercase tracking-[0.08em] sm:text-3xl md:text-4xl">
-                  {title}
-                </h1>
-                {subtitle ? (
-                  <p className="max-w-3xl text-sm text-slate-300 md:text-base">{subtitle}</p>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {!viewer?.id ? (
-                  <Link
-                    href="/login"
-                    className="rounded-xl border border-blue-300/40 bg-blue-500/20 px-3 py-2 text-xs font-semibold text-blue-100 transition-colors hover:bg-blue-500/30"
-                  >
-                    Entrar
-                  </Link>
-                ) : (
-                  <LogoutButton />
-                )}
-              </div>
+            <div>
+              <h1 className="font-display text-2xl uppercase tracking-[0.08em] sm:text-3xl md:text-4xl">
+                {title}
+              </h1>
+              {subtitle ? (
+                <p className="max-w-3xl text-sm text-slate-300 md:text-base">{subtitle}</p>
+              ) : null}
             </div>
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1600px] px-4 pb-10 pt-5 md:px-7 md:pt-6">
+        <main className="mx-auto w-full max-w-[1600px] px-4 pb-10 pt-16 md:px-7 md:pt-6">
           {children}
         </main>
       </div>

@@ -1,10 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/cn";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { isSupabaseConfigured } from "@/lib/supabase-env";
 
-export function LogoutButton() {
+interface LogoutButtonProps {
+  className?: string;
+}
+
+export function LogoutButton({ className }: LogoutButtonProps) {
   const router = useRouter();
   const supabaseEnabled = isSupabaseConfigured();
 
@@ -28,7 +33,10 @@ export function LogoutButton() {
     <button
       type="button"
       onClick={() => void handleLogout()}
-      className="rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-100 transition-colors hover:bg-white/10"
+      className={cn(
+        "rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-100 transition-colors hover:bg-white/10",
+        className,
+      )}
     >
       Sair
     </button>

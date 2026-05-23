@@ -16,6 +16,7 @@ import {
   FiX,
 } from "react-icons/fi";
 import { cn } from "@/lib/cn";
+import { LogoutButton } from "@/components/logout-button";
 
 export type ShellIconKey =
   | "dashboard"
@@ -34,6 +35,7 @@ export interface ShellNavItem {
 
 interface ShellNavProps {
   items: ShellNavItem[];
+  viewerId?: string;
   viewerName?: string;
   modeLabel: string;
 }
@@ -51,12 +53,14 @@ const iconMap: Record<ShellIconKey, React.ComponentType<{ className?: string }>>
 function NavContent({
   items,
   pathname,
+  viewerId,
   viewerName,
   modeLabel,
   onNavigate,
 }: {
   items: ShellNavItem[];
   pathname: string;
+  viewerId?: string;
   viewerName?: string;
   modeLabel: string;
   onNavigate?: () => void;
@@ -67,9 +71,7 @@ function NavContent({
         <p className="font-display text-3xl uppercase tracking-[0.12em] text-[var(--wb-ice)]">
           WorldBet 26
         </p>
-        <p className="mt-1 text-xs text-slate-300">
-          Plataforma premium de bolão Copa 2026
-        </p>
+        <p className="mt-1 text-xs text-slate-300">Plataforma premium de bolao Copa 2026</p>
       </div>
 
       <nav className="space-y-1 px-3 py-4">
@@ -102,19 +104,33 @@ function NavContent({
       </nav>
 
       <div className="mt-auto border-t border-white/10 px-5 py-4">
-        <p className="text-xs text-slate-400">Sessão ativa</p>
+        <p className="text-xs text-slate-400">Sessao ativa</p>
         <p className="mt-1 text-sm font-semibold text-slate-200">
           {viewerName?.trim() ? viewerName : "Convidado"}
         </p>
         <p className="mt-2 inline-flex rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-slate-300">
           {modeLabel}
         </p>
+
+        <div className="mt-3">
+          {viewerId ? (
+            <LogoutButton className="w-full justify-center py-2.5 text-sm" />
+          ) : (
+            <Link
+              href="/login"
+              onClick={onNavigate}
+              className="inline-flex w-full items-center justify-center rounded-xl border border-blue-300/35 bg-blue-500/20 px-3 py-2.5 text-sm font-semibold text-blue-100 transition-colors hover:bg-blue-500/30"
+            >
+              Entrar
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-export function ShellNav({ items, viewerName, modeLabel }: ShellNavProps) {
+export function ShellNav({ items, viewerId, viewerName, modeLabel }: ShellNavProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -124,6 +140,7 @@ export function ShellNav({ items, viewerName, modeLabel }: ShellNavProps) {
         <NavContent
           items={items}
           pathname={pathname}
+          viewerId={viewerId}
           viewerName={viewerName}
           modeLabel={modeLabel}
         />
@@ -135,7 +152,7 @@ export function ShellNav({ items, viewerName, modeLabel }: ShellNavProps) {
         onClick={() => setOpen(true)}
         className={cn(
           "fixed left-4 top-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-[#0b1e3adf] text-white shadow-[0_10px_24px_rgba(3,9,22,0.4)] lg:hidden",
-          open ? "opacity-0 pointer-events-none" : "opacity-100",
+          open ? "pointer-events-none opacity-0" : "opacity-100",
         )}
       >
         <FiMenu className="text-lg" />
@@ -172,6 +189,7 @@ export function ShellNav({ items, viewerName, modeLabel }: ShellNavProps) {
               <NavContent
                 items={items}
                 pathname={pathname}
+                viewerId={viewerId}
                 viewerName={viewerName}
                 modeLabel={modeLabel}
                 onNavigate={() => setOpen(false)}

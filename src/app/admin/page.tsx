@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -651,7 +651,7 @@ export default async function AdminPage({
         <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
           <Surface className="p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="font-display text-3xl uppercase tracking-[0.08em] text-white">
+              <h2 className="font-display text-2xl md:text-3xl uppercase tracking-[0.08em] text-white">
                 Cadastrar jogo
               </h2>
               <Badge tone="admin">Match management</Badge>
@@ -733,7 +733,7 @@ export default async function AdminPage({
           </Surface>
 
           <Surface className="p-5">
-            <h2 className="font-display text-3xl uppercase tracking-[0.08em] text-white">
+            <h2 className="font-display text-2xl md:text-3xl uppercase tracking-[0.08em] text-white">
               Ferramentas
             </h2>
             <p className="mt-1 text-sm text-slate-300">
@@ -759,7 +759,7 @@ export default async function AdminPage({
         <section>
           <Surface className="p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="font-display text-3xl uppercase tracking-[0.08em] text-white">
+              <h2 className="font-display text-2xl md:text-3xl uppercase tracking-[0.08em] text-white">
                 Importacao CSV de jogos
               </h2>
               <Badge tone="admin">Bulk import</Badge>
@@ -792,7 +792,7 @@ export default async function AdminPage({
         </section>
 
         <section className="space-y-3">
-          <h2 className="font-display text-3xl uppercase tracking-[0.08em] text-white">
+          <h2 className="font-display text-2xl md:text-3xl uppercase tracking-[0.08em] text-white">
             Gestao de placares
           </h2>
           <Surface className="p-4">
@@ -862,7 +862,7 @@ export default async function AdminPage({
                         {match.groupName ? ` | Grupo ${match.groupName}` : ""}
                         {match.roundNumber ? ` | Rodada ${match.roundNumber}` : ""}
                       </p>
-                      <div className="grid items-center gap-2 grid-cols-[1fr_auto_1fr]">
+                      <div className="grid gap-2 md:grid-cols-[1fr_auto_1fr] md:items-center">
                         <TeamPill teamName={match.homeTeam} />
                         <span className="font-display text-3xl text-white">vs</span>
                         <TeamPill teamName={match.awayTeam} align="right" />
@@ -958,7 +958,7 @@ export default async function AdminPage({
         </section>
 
         <section className="space-y-2">
-          <h2 className="font-display text-3xl uppercase tracking-[0.08em] text-white">
+          <h2 className="font-display text-2xl md:text-3xl uppercase tracking-[0.08em] text-white">
             Reabrir jogos fechados
           </h2>
           <p className="text-sm text-slate-300">
@@ -967,12 +967,18 @@ export default async function AdminPage({
           <div className="grid gap-2">
             {closedMatches.map((match) => (
               <form key={`reopen-${match.id}`} action={reopenMatch}>
-                <Surface className="flex flex-wrap items-center justify-between gap-2 p-3">
+                <Surface className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
                   <input type="hidden" name="match_id" value={match.id} />
                   <p className="text-sm text-slate-100">
                     {match.homeTeam} x {match.awayTeam}
                   </p>
-                  <Button type="submit" variant="danger" size="sm" disabled={!viewer.isAdmin}>
+                  <Button
+                    type="submit"
+                    variant="danger"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    disabled={!viewer.isAdmin}
+                  >
                     Reabrir
                   </Button>
                 </Surface>
@@ -987,21 +993,21 @@ export default async function AdminPage({
         </section>
 
         <section className="space-y-3">
-          <h2 className="font-display text-3xl uppercase tracking-[0.08em] text-white">
+          <h2 className="font-display text-2xl md:text-3xl uppercase tracking-[0.08em] text-white">
             Gestao de contas
           </h2>
           <div className="grid gap-2">
             {profiles.map((account) => (
               <Surface
                 key={account.id}
-                className="flex flex-wrap items-center justify-between gap-3 p-3"
+                className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
                   <p className="text-sm font-semibold text-slate-100">{account.displayName}</p>
                   <p className="text-xs text-slate-300">@{account.username}</p>
                   <p className="text-xs text-slate-400">{account.email}</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
                   <Badge tone={account.isAdmin ? "admin" : "neutral"}>
                     {account.isAdmin ? "Admin" : "Usuario"}
                   </Badge>
@@ -1016,7 +1022,13 @@ export default async function AdminPage({
                       name="next_admin"
                       value={account.isAdmin ? "false" : "true"}
                     />
-                    <Button type="submit" size="sm" variant="ghost" disabled={!viewer.isAdmin}>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="ghost"
+                      className="w-full sm:w-auto"
+                      disabled={!viewer.isAdmin}
+                    >
                       {account.isAdmin ? "Remover admin" : "Tornar admin"}
                     </Button>
                   </form>
@@ -1028,7 +1040,13 @@ export default async function AdminPage({
                       name="next_active"
                       value={account.isActive ? "false" : "true"}
                     />
-                    <Button type="submit" size="sm" variant="secondary" disabled={!viewer.isAdmin}>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      variant="secondary"
+                      className="w-full sm:w-auto"
+                      disabled={!viewer.isAdmin}
+                    >
                       {account.isActive ? "Desativar" : "Reativar"}
                     </Button>
                   </form>
