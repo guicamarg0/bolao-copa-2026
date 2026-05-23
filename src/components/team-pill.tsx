@@ -18,7 +18,7 @@ export function TeamPill({ teamName, align = "left", className }: TeamPillProps)
 
   return (
     <div className={cn("flex items-center gap-2", alignment, className)}>
-      <span className="text-base leading-none" aria-hidden>
+      <span className="text-2xl leading-none md:text-[1.75rem]" aria-hidden>
         {team?.flag ?? "🏳️"}
       </span>
       <span className="truncate text-sm font-semibold text-[var(--wb-ice)]">
