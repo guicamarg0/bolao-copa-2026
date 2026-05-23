@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -26,7 +27,7 @@ import { getStorageMode } from "@/lib/storage-mode";
 import { isSupabaseConfigured } from "@/lib/supabase-env";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { WORLD_CUP_2026_TEAMS } from "@/lib/teams";
-import type { MatchStage } from "@/lib/types";
+import type { Match, MatchStage } from "@/lib/types";
 
 const stageOptions: Array<{ value: MatchStage; label: string }> = [
   { value: "group", label: "Fase de grupos" },
@@ -38,6 +39,9 @@ const stageOptions: Array<{ value: MatchStage; label: string }> = [
   { value: "final", label: "Final" },
 ];
 
+type ScoreStatusFilter = "all" | "open" | "closed";
+const SCORE_PAGE_SIZE = 6;
+
 function toSafeQueryValue(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -48,6 +52,44 @@ function toSafeCount(value: unknown): number {
     return 0;
   }
   return parsed;
+}
+
+function toPositivePage(value: unknown): number {
+  const parsed = Number.parseInt(toSafeQueryValue(value), 10);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return 1;
+  }
+  return parsed;
+}
+
+function toScoreStatusFilter(value: unknown): ScoreStatusFilter {
+  const parsed = toSafeQueryValue(value);
+  if (parsed === "open" || parsed === "closed") {
+    return parsed;
+  }
+  return "all";
+}
+
+function buildScoreOptions(matches: Match[]) {
+  const stage = Array.from(new Set(matches.map((match) => match.stage)));
+  const group = Array.from(
+    new Set(
+      matches
+        .map((match) => match.groupName)
+        .filter((current): current is string => Boolean(current)),
+    ),
+  ).sort((left, right) =>
+    left.localeCompare(right, "pt-BR", { numeric: true, sensitivity: "base" }),
+  );
+  const round = Array.from(
+    new Set(
+      matches
+        .map((match) => match.roundNumber)
+        .filter((current): current is number => Number.isInteger(current)),
+    ),
+  ).sort((left, right) => left - right);
+
+  return { stage, group, round };
 }
 
 function parseOptionalPositiveInt(raw: FormDataEntryValue | null): number | null | "invalid" {
@@ -453,6 +495,11 @@ export default async function AdminPage({
     csv_updated?: string;
     csv_skipped?: string;
     csv_error?: string;
+    score_status?: string;
+    score_stage?: string;
+    score_group?: string;
+    score_round?: string;
+    score_page?: string;
   }>;
 }) {
   const viewer = await requireAuthenticatedViewer();
@@ -468,9 +515,84 @@ export default async function AdminPage({
   const csvUpdated = toSafeCount(query.csv_updated);
   const csvSkipped = toSafeCount(query.csv_skipped);
   const csvError = toSafeQueryValue(query.csv_error);
+  const scoreStatus = toScoreStatusFilter(query.score_status);
+  const scoreStage = toSafeQueryValue(query.score_stage) || "all";
+  const scoreGroup = toSafeQueryValue(query.score_group) || "all";
+  const scoreRound = toSafeQueryValue(query.score_round) || "all";
+  const requestedScorePage = toPositivePage(query.score_page);
 
   const closedMatches = matches.filter((match) => match.isClosed);
   const activeUsers = profiles.filter((profile) => profile.isActive);
+  const sortedMatches = [...matches].sort(
+    (left, right) =>
+      new Date(left.kickoffAt).getTime() - new Date(right.kickoffAt).getTime(),
+  );
+  const scoreOptions = buildScoreOptions(sortedMatches);
+  const stageAllowList = new Set(scoreOptions.stage);
+
+  const filteredScoreMatches = sortedMatches.filter((match) => {
+    if (scoreStatus === "open" && match.isClosed) {
+      return false;
+    }
+    if (scoreStatus === "closed" && !match.isClosed) {
+      return false;
+    }
+
+    if (scoreStage !== "all") {
+      if (!stageAllowList.has(scoreStage as MatchStage)) {
+        return false;
+      }
+      if (match.stage !== scoreStage) {
+        return false;
+      }
+    }
+
+    if (scoreGroup !== "all" && match.groupName !== scoreGroup) {
+      return false;
+    }
+
+    if (scoreRound !== "all") {
+      const parsedRound = Number.parseInt(scoreRound, 10);
+      if (!Number.isInteger(parsedRound) || parsedRound <= 0) {
+        return false;
+      }
+      if (match.roundNumber !== parsedRound) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  const scoreTotalPages = Math.max(
+    1,
+    Math.ceil(filteredScoreMatches.length / SCORE_PAGE_SIZE),
+  );
+  const scoreCurrentPage = Math.min(requestedScorePage, scoreTotalPages);
+  const scoreStart = (scoreCurrentPage - 1) * SCORE_PAGE_SIZE;
+  const scoreVisibleMatches = filteredScoreMatches.slice(
+    scoreStart,
+    scoreStart + SCORE_PAGE_SIZE,
+  );
+
+  const scoreQueryBase = new URLSearchParams();
+  if (scoreStatus !== "all") {
+    scoreQueryBase.set("score_status", scoreStatus);
+  }
+  if (scoreStage !== "all") {
+    scoreQueryBase.set("score_stage", scoreStage);
+  }
+  if (scoreGroup !== "all") {
+    scoreQueryBase.set("score_group", scoreGroup);
+  }
+  if (scoreRound !== "all") {
+    scoreQueryBase.set("score_round", scoreRound);
+  }
+
+  const previousPageQuery = new URLSearchParams(scoreQueryBase);
+  previousPageQuery.set("score_page", String(Math.max(1, scoreCurrentPage - 1)));
+  const nextPageQuery = new URLSearchParams(scoreQueryBase);
+  nextPageQuery.set("score_page", String(Math.min(scoreTotalPages, scoreCurrentPage + 1)));
 
   return (
     <AppShell
@@ -673,13 +795,68 @@ export default async function AdminPage({
           <h2 className="font-display text-3xl uppercase tracking-[0.08em] text-white">
             Gestao de placares
           </h2>
+          <Surface className="p-4">
+            <form method="get" className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_auto_auto] md:items-end">
+              <label className="space-y-1 text-xs uppercase tracking-wide text-slate-300">
+                Status
+                <Select name="score_status" defaultValue={scoreStatus}>
+                  <option value="all">Todos</option>
+                  <option value="open">Abertos</option>
+                  <option value="closed">Encerrados</option>
+                </Select>
+              </label>
+              <label className="space-y-1 text-xs uppercase tracking-wide text-slate-300">
+                Fase
+                <Select name="score_stage" defaultValue={scoreStage}>
+                  <option value="all">Todas as fases</option>
+                  {scoreOptions.stage.map((stage) => (
+                    <option key={`score-stage-${stage}`} value={stage}>
+                      {STAGE_LABEL[stage]}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label className="space-y-1 text-xs uppercase tracking-wide text-slate-300">
+                Grupo
+                <Select name="score_group" defaultValue={scoreGroup}>
+                  <option value="all">Todos os grupos</option>
+                  {scoreOptions.group.map((group) => (
+                    <option key={`score-group-${group}`} value={group}>
+                      Grupo {group}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label className="space-y-1 text-xs uppercase tracking-wide text-slate-300">
+                Rodada
+                <Select name="score_round" defaultValue={scoreRound}>
+                  <option value="all">Todas as rodadas</option>
+                  {scoreOptions.round.map((round) => (
+                    <option key={`score-round-${round}`} value={String(round)}>
+                      Rodada {round}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <Button type="submit" variant="secondary">
+                Aplicar filtros
+              </Button>
+              <Link
+                href="/admin"
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-[var(--wb-border)] px-4 text-sm font-semibold text-[var(--wb-light)] transition-colors hover:bg-white/5"
+              >
+                Limpar
+              </Link>
+            </form>
+          </Surface>
+
           <div className="grid gap-3">
-            {matches.map((match) => (
+            {scoreVisibleMatches.map((match) => (
               <form key={match.id} action={saveOfficialResult}>
                 <Surface className="p-4">
                   <input type="hidden" name="match_id" value={match.id} />
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div className="space-y-1">
+                    <div className="space-y-1 min-w-0">
                       <p className="text-xs uppercase tracking-wide text-slate-300">
                         {STAGE_LABEL[match.stage]}
                         {match.groupName ? ` | Grupo ${match.groupName}` : ""}
@@ -704,7 +881,7 @@ export default async function AdminPage({
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-end gap-3">
+                  <div className="grid gap-3 md:grid-cols-[auto_auto_auto] md:items-end">
                     <label className="space-y-1 text-xs uppercase tracking-wide text-slate-300">
                       Gols {match.homeTeam}
                       <Input
@@ -713,7 +890,7 @@ export default async function AdminPage({
                         required
                         name="home_score"
                         defaultValue={match.homeScore ?? 0}
-                        className="w-24"
+                        className="w-full md:w-24"
                         disabled={!viewer.isAdmin}
                       />
                     </label>
@@ -725,7 +902,7 @@ export default async function AdminPage({
                         required
                         name="away_score"
                         defaultValue={match.awayScore ?? 0}
-                        className="w-24"
+                        className="w-full md:w-24"
                         disabled={!viewer.isAdmin}
                       />
                     </label>
@@ -736,6 +913,47 @@ export default async function AdminPage({
                 </Surface>
               </form>
             ))}
+
+            {scoreVisibleMatches.length === 0 ? (
+              <Surface className="p-4">
+                <p className="text-sm text-slate-300">
+                  Nenhum jogo encontrado para os filtros selecionados.
+                </p>
+              </Surface>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
+            <p className="text-slate-300">
+              Pagina {scoreCurrentPage} de {scoreTotalPages} | {filteredScoreMatches.length} jogos
+            </p>
+            <div className="flex w-full gap-2 sm:w-auto">
+              <Link
+                href={`/admin?${previousPageQuery.toString()}`}
+                aria-disabled={scoreCurrentPage <= 1}
+                className={`inline-flex h-9 items-center justify-center rounded-xl border px-3 text-xs font-semibold transition ${
+                  scoreCurrentPage <= 1
+                    ? "pointer-events-none border-white/10 text-slate-500"
+                    : "border-[var(--wb-border)] text-[var(--wb-light)] hover:bg-white/5"
+                }`}
+              >
+                Anterior
+              </Link>
+              <span className="inline-flex min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-slate-100">
+                {scoreCurrentPage}
+              </span>
+              <Link
+                href={`/admin?${nextPageQuery.toString()}`}
+                aria-disabled={scoreCurrentPage >= scoreTotalPages}
+                className={`inline-flex h-9 items-center justify-center rounded-xl border px-3 text-xs font-semibold transition ${
+                  scoreCurrentPage >= scoreTotalPages
+                    ? "pointer-events-none border-white/10 text-slate-500"
+                    : "border-[var(--wb-border)] text-[var(--wb-light)] hover:bg-white/5"
+                }`}
+              >
+                Proxima
+              </Link>
+            </div>
           </div>
         </section>
 

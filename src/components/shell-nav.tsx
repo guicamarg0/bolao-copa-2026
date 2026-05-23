@@ -133,7 +133,10 @@ export function ShellNav({ items, viewerName, modeLabel }: ShellNavProps) {
         type="button"
         aria-label="Abrir menu"
         onClick={() => setOpen(true)}
-        className="fixed left-4 top-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-[#0b1e3adf] text-white shadow-[0_10px_24px_rgba(3,9,22,0.4)] lg:hidden"
+        className={cn(
+          "fixed left-4 top-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-[#0b1e3adf] text-white shadow-[0_10px_24px_rgba(3,9,22,0.4)] lg:hidden",
+          open ? "opacity-0 pointer-events-none" : "opacity-100",
+        )}
       >
         <FiMenu className="text-lg" />
       </button>
@@ -152,7 +155,7 @@ export function ShellNav({ items, viewerName, modeLabel }: ShellNavProps) {
             />
 
             <motion.aside
-              className="fixed inset-y-0 left-0 z-50 w-72 border-r border-white/10 bg-[linear-gradient(180deg,#0B1E3A,#102347,#0F1F3A)] lg:hidden"
+              className="fixed inset-y-0 left-0 z-50 w-[min(88vw,22rem)] border-r border-white/10 bg-[linear-gradient(180deg,#0B1E3A,#102347,#0F1F3A)] lg:hidden"
               initial={{ x: -320 }}
               animate={{ x: 0 }}
               exit={{ x: -320 }}

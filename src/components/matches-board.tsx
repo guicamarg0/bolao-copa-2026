@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { MatchCard } from "@/components/match-card";
-import { Select } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/field";
 import { STAGE_LABEL } from "@/lib/match-ui";
 import { isMatchFinished, isPredictionLocked } from "@/lib/scoring";
 import type { Match } from "@/lib/types";
@@ -100,7 +100,7 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
   return (
     <section className="space-y-5">
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_auto] md:items-end">
           <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
             Fase
             <Select
@@ -239,12 +239,13 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
 
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
               <p className="text-slate-300">
-                Pagina {currentPage} de {totalPages} • {filteredMatches.length} jogos
+                Pagina {currentPage} de {totalPages} | {filteredMatches.length} jogos
               </p>
-              <div className="flex gap-2">
+              <div className="flex w-full gap-2 sm:w-auto">
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="flex-1 sm:flex-none"
                   disabled={currentPage <= 1}
                   onClick={() => setPage(Math.max(1, currentPage - 1))}
                 >
@@ -253,13 +254,14 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
                 <motion.div
                   initial={{ opacity: 0.6 }}
                   animate={{ opacity: 1 }}
-                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-slate-100"
+                  className="inline-flex min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-slate-100"
                 >
                   {currentPage}
                 </motion.div>
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="flex-1 sm:flex-none"
                   disabled={currentPage >= totalPages}
                   onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
                 >

@@ -47,14 +47,14 @@ export function AppShell({ title, subtitle, viewer, children }: AppShellProps) {
 
       <div className="lg:pl-72">
         <header className="sticky top-0 z-30 border-b border-white/10 bg-[rgba(9,20,39,0.75)] backdrop-blur-xl">
-          <div className="mx-auto w-full px-4 py-4 pl-16 md:px-7 md:pl-16 lg:pl-7">
+          <div className="mx-auto w-full max-w-[1600px] px-4 pb-4 pt-5 pl-16 md:px-7 md:pl-16 lg:pl-7">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <h1 className="font-display text-3xl uppercase tracking-[0.08em] md:text-4xl">
+                <h1 className="font-display text-2xl uppercase tracking-[0.08em] sm:text-3xl md:text-4xl">
                   {title}
                 </h1>
                 {subtitle ? (
-                  <p className="text-sm text-slate-300 md:text-base">{subtitle}</p>
+                  <p className="max-w-3xl text-sm text-slate-300 md:text-base">{subtitle}</p>
                 ) : null}
               </div>
 
@@ -74,7 +74,9 @@ export function AppShell({ title, subtitle, viewer, children }: AppShellProps) {
           </div>
         </header>
 
-        <main className="mx-auto w-full px-4 pb-10 pt-6 md:px-7">{children}</main>
+        <main className="mx-auto w-full max-w-[1600px] px-4 pb-10 pt-5 md:px-7 md:pt-6">
+          {children}
+        </main>
       </div>
     </div>
   );
