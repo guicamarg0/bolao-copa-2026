@@ -22,6 +22,7 @@ import {
 } from "@/lib/app-db";
 import { getMatches, getProfiles } from "@/lib/data";
 import { parseMatchesCsv } from "@/lib/match-csv";
+import { notifyFinishedMatchResult } from "@/lib/match-prediction-report";
 import { STAGE_LABEL } from "@/lib/match-ui";
 import { getStorageMode } from "@/lib/storage-mode";
 import { isSupabaseConfigured } from "@/lib/supabase-env";
@@ -380,6 +381,8 @@ async function saveOfficialResult(formData: FormData) {
     await requireAppAdmin();
     await closeAppMatch(matchId, homeScore, awayScore);
   }
+
+  await notifyFinishedMatchResult({ matchId, homeScore, awayScore }).catch(() => null);
 
   revalidatePath("/");
   revalidatePath("/jogos");

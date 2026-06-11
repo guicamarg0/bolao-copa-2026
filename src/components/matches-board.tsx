@@ -79,17 +79,6 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
     });
   }, [groupFilter, matches, roundFilter, stage, status]);
 
-  const featuredMatches = useMemo(() => {
-    const upcoming = filteredMatches
-      .filter((match) => !isMatchFinished(match))
-      .sort(
-        (left, right) =>
-          new Date(left.kickoffAt).getTime() - new Date(right.kickoffAt).getTime(),
-      );
-
-    return (upcoming.length > 0 ? upcoming : filteredMatches).slice(0, 2);
-  }, [filteredMatches]);
-
   const totalPages = Math.max(1, Math.ceil(filteredMatches.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginatedMatches = useMemo(() => {
@@ -188,26 +177,6 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
           </div>
         </div>
       </div>
-
-      {featuredMatches.length > 0 ? (
-        <div className="space-y-3">
-          <h2 className="font-display text-2xl uppercase tracking-[0.08em] text-[var(--wb-ice)]">
-            Destaques da rodada
-          </h2>
-          <div className="grid gap-4 xl:grid-cols-2">
-            {featuredMatches.map((match) => (
-              <motion.div
-                key={`featured-${match.id}`}
-                initial={{ opacity: 0, y: 22 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35 }}
-              >
-                <MatchCard match={match} featured />
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       <div className="space-y-3">
         <h2 className="font-display text-2xl uppercase tracking-[0.08em] text-[var(--wb-ice)]">

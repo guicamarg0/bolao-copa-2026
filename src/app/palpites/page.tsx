@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { PredictionBoard } from "@/components/prediction-board";
+import { ScoringSystemButton } from "@/components/scoring-system-button";
 import { requireAuthenticatedViewer } from "@/lib/auth-guard";
 import { getMatches, getPredictionsForUser } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/supabase-env";
@@ -19,12 +20,17 @@ export default async function PalpitesPage() {
       subtitle="Experiência de aposta fantasy com edição por partida e histórico de jogos fechados"
       viewer={viewer}
     >
-      <PredictionBoard
-        matches={matches}
-        initialPredictions={predictions}
-        viewer={viewer}
-        supabaseEnabled={supabaseEnabled}
-      />
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <ScoringSystemButton />
+        </div>
+        <PredictionBoard
+          matches={matches}
+          initialPredictions={predictions}
+          viewer={viewer}
+          supabaseEnabled={supabaseEnabled}
+        />
+      </div>
     </AppShell>
   );
 }

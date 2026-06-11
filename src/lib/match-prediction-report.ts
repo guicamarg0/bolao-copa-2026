@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Pool, type PoolClient } from "pg";
+import { scorePrediction } from "@/lib/scoring";
 import { getTeamInfoByName } from "@/lib/teams";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -16,6 +17,8 @@ interface MatchRow {
   away_team: string;
   kickoff_at: string;
   venue: string | null;
+  home_score?: number | null;
+  away_score?: number | null;
 }
 
 interface ProfileRow {
@@ -160,6 +163,42 @@ function buildPredictionLines(params: {
   });
 }
 
+function buildFinishedPredictionLines(params: {
+  profiles: ProfileRow[];
+  predictions: PredictionRow[];
+  homeScore: number;
+  awayScore: number;
+}): string[] {
+  const predictionByUser = new Map<string, PredictionRow>();
+  for (const prediction of params.predictions) {
+    predictionByUser.set(prediction.user_id, prediction);
+  }
+
+  if (params.profiles.length === 0) {
+    return ["Nenhum usuario ativo encontrado."];
+  }
+
+  return params.profiles.map((profile) => {
+    const prediction = predictionByUser.get(profile.id);
+    if (!prediction) {
+      return `${profile.display_name} - N/A - 0 pts`;
+    }
+
+    const points = scorePrediction(
+      {
+        homeGoals: prediction.home_goals,
+        awayGoals: prediction.away_goals,
+      },
+      {
+        homeScore: params.homeScore,
+        awayScore: params.awayScore,
+      },
+    ).points;
+
+    return `${profile.display_name} - ${prediction.home_goals} x ${prediction.away_goals} - ${points} pts`;
+  });
+}
+
 function limitTelegramBody(lines: string[]): string {
   const body = lines.join("\n");
   if (body.length <= TELEGRAM_MESSAGE_LIMIT) {
@@ -206,6 +245,59 @@ async function sendTelegramMessage(params: {
     ...buildPredictionLines({
       profiles: params.profiles,
       predictions: params.predictions,
+    }),
+  ];
+
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: limitTelegramBody(body),
+      disable_web_page_preview: true,
+    }),
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | { ok?: boolean; result?: { message_id?: number }; description?: string }
+    | null;
+
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(payload?.description ?? "Falha ao enviar Telegram.");
+  }
+
+  return payload?.result?.message_id ? String(payload.result.message_id) : null;
+}
+
+async function sendFinishedMatchTelegramMessage(params: {
+  match: MatchRow;
+  homeScore: number;
+  awayScore: number;
+  profiles: ProfileRow[];
+  predictions: PredictionRow[];
+}): Promise<string | null> {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
+
+  if (!botToken || !chatId) {
+    return null;
+  }
+
+  const body = [
+    "WorldBet 26 - Jogo Finalizado",
+    `Jogo: ${getMatchLabel(params.match)}`,
+    `Horario: ${formatLocalDateTime(params.match.kickoff_at)}`,
+    `Placar Final: ${params.homeScore} x ${params.awayScore}`,
+    "",
+    "Palpites",
+    "",
+    ...buildFinishedPredictionLines({
+      profiles: params.profiles,
+      predictions: params.predictions,
+      homeScore: params.homeScore,
+      awayScore: params.awayScore,
     }),
   ];
 
@@ -469,6 +561,63 @@ export async function processMatchPredictionLocks(
       message: `${processed.length} jogo(s) processado(s).`,
       processed,
     };
+  } finally {
+    client.release();
+  }
+}
+
+export async function notifyFinishedMatchResult(params: {
+  matchId: string;
+  homeScore: number;
+  awayScore: number;
+}): Promise<string | null> {
+  const pool = getPool();
+  if (!pool) {
+    return null;
+  }
+
+  const client = await pool.connect();
+  try {
+    const [matchResult, profilesResult, predictionsResult] = await Promise.all([
+      client.query<MatchRow>(
+        `
+          SELECT id, stage, group_name, match_number, round_number, home_team, away_team, kickoff_at, venue, home_score, away_score
+          FROM public.matches
+          WHERE id = $1
+          LIMIT 1
+        `,
+        [params.matchId],
+      ),
+      client.query<ProfileRow>(
+        `
+          SELECT id, username, display_name, email
+          FROM public.profiles
+          WHERE is_active = true
+          ORDER BY display_name ASC
+        `,
+      ),
+      client.query<PredictionRow>(
+        `
+          SELECT user_id, match_id, home_goals, away_goals
+          FROM public.predictions
+          WHERE match_id = $1
+        `,
+        [params.matchId],
+      ),
+    ]);
+
+    const match = matchResult.rows[0];
+    if (!match) {
+      return null;
+    }
+
+    return sendFinishedMatchTelegramMessage({
+      match,
+      homeScore: params.homeScore,
+      awayScore: params.awayScore,
+      profiles: profilesResult.rows,
+      predictions: predictionsResult.rows,
+    });
   } finally {
     client.release();
   }
