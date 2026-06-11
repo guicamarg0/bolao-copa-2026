@@ -3,6 +3,7 @@ import "server-only";
 import { Pool, type PoolClient } from "pg";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
+const TELEGRAM_MESSAGE_LIMIT = 3900;
 
 interface MatchRow {
   id: string;
@@ -133,10 +134,54 @@ function buildCsv(params: {
   return lines.join("\n");
 }
 
+function buildPredictionLines(params: {
+  profiles: ProfileRow[];
+  predictions: PredictionRow[];
+}): string[] {
+  const predictionByUser = new Map<string, PredictionRow>();
+  for (const prediction of params.predictions) {
+    predictionByUser.set(prediction.user_id, prediction);
+  }
+
+  const lines = params.profiles.flatMap((profile) => {
+    const prediction = predictionByUser.get(profile.id);
+    if (!prediction) {
+      return [];
+    }
+
+    return [`${profile.display_name} - ${prediction.home_goals} x ${prediction.away_goals}`];
+  });
+
+  return lines.length > 0 ? lines : ["Sem palpites registrados."];
+}
+
+function limitTelegramBody(lines: string[]): string {
+  const body = lines.join("\n");
+  if (body.length <= TELEGRAM_MESSAGE_LIMIT) {
+    return body;
+  }
+
+  const limited: string[] = [];
+  let length = 0;
+  for (const line of lines) {
+    const nextLength = length + line.length + (limited.length > 0 ? 1 : 0);
+    if (nextLength + "\n...".length > TELEGRAM_MESSAGE_LIMIT) {
+      break;
+    }
+
+    limited.push(line);
+    length = nextLength;
+  }
+
+  limited.push("...");
+  return limited.join("\n");
+}
+
 async function sendTelegramMessage(params: {
   match: MatchRow;
   lockDeadlineAt: string;
-  reportUrl: string | null;
+  profiles: ProfileRow[];
+  predictions: PredictionRow[];
 }): Promise<string | null> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
   const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
@@ -145,16 +190,19 @@ async function sendTelegramMessage(params: {
     return null;
   }
 
-  const reportLine = params.reportUrl
-    ? `Relatorio CSV: ${params.reportUrl}`
-    : "Relatorio CSV salvo no banco.";
   const body = [
     `WorldBet 26 - Palpites fechados`,
     `Jogo: ${getMatchLabel(params.match)}`,
     `Horario: ${formatLocalDateTime(params.match.kickoff_at)}`,
     `Fechamento: ${formatLocalDateTime(params.lockDeadlineAt)}`,
-    reportLine,
-  ].join("\n");
+    "",
+    "Palpites",
+    "",
+    ...buildPredictionLines({
+      profiles: params.profiles,
+      predictions: params.predictions,
+    }),
+  ];
 
   const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
@@ -163,8 +211,8 @@ async function sendTelegramMessage(params: {
     },
     body: JSON.stringify({
       chat_id: chatId,
-      text: body,
-      disable_web_page_preview: !params.reportUrl,
+      text: limitTelegramBody(body),
+      disable_web_page_preview: true,
     }),
   });
 
@@ -223,26 +271,26 @@ async function processMatchPredictionLock(
   let reportCsv = existing?.report_csv ?? null;
   const reportUrl = existing?.report_url ?? null;
 
-  if (!reportId || !reportCsv) {
-    const [profilesResult, predictionsResult] = await Promise.all([
-      client.query<ProfileRow>(
-        `
-          SELECT id, username, display_name, email
-          FROM public.profiles
-          WHERE is_active = true
-          ORDER BY display_name ASC
-        `,
-      ),
-      client.query<PredictionRow>(
-        `
-          SELECT user_id, match_id, home_goals, away_goals
-          FROM public.predictions
-          WHERE match_id = $1
-        `,
-        [match.id],
-      ),
-    ]);
+  const [profilesResult, predictionsResult] = await Promise.all([
+    client.query<ProfileRow>(
+      `
+        SELECT id, username, display_name, email
+        FROM public.profiles
+        WHERE is_active = true
+        ORDER BY display_name ASC
+      `,
+    ),
+    client.query<PredictionRow>(
+      `
+        SELECT user_id, match_id, home_goals, away_goals
+        FROM public.predictions
+        WHERE match_id = $1
+      `,
+      [match.id],
+    ),
+  ]);
 
+  if (!reportId || !reportCsv) {
     reportCsv = buildCsv({
       match,
       lockDeadlineAt: lockDeadlineAt.toISOString(),
@@ -310,7 +358,8 @@ async function processMatchPredictionLock(
     const telegramMessageId = await sendTelegramMessage({
       match,
       lockDeadlineAt: lockDeadlineAt.toISOString(),
-      reportUrl,
+      profiles: profilesResult.rows,
+      predictions: predictionsResult.rows,
     });
 
     await client.query(
