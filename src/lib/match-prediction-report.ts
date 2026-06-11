@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Pool, type PoolClient } from "pg";
+import { getTeamInfoByName } from "@/lib/teams";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const TELEGRAM_MESSAGE_LIMIT = 3900;
@@ -95,7 +96,12 @@ function csvCell(value: string): string {
 }
 
 function getMatchLabel(match: MatchRow): string {
-  return `${match.home_team} x ${match.away_team}`;
+  return `${formatTeamName(match.home_team)} x ${formatTeamName(match.away_team)}`;
+}
+
+function formatTeamName(teamName: string): string {
+  const team = getTeamInfoByName(teamName);
+  return team ? `${team.flag} ${teamName}` : teamName;
 }
 
 function buildCsv(params: {
@@ -143,16 +149,15 @@ function buildPredictionLines(params: {
     predictionByUser.set(prediction.user_id, prediction);
   }
 
-  const lines = params.profiles.flatMap((profile) => {
+  if (params.profiles.length === 0) {
+    return ["Nenhum usuario ativo encontrado."];
+  }
+
+  return params.profiles.map((profile) => {
     const prediction = predictionByUser.get(profile.id);
-    if (!prediction) {
-      return [];
-    }
-
-    return [`${profile.display_name} - ${prediction.home_goals} x ${prediction.away_goals}`];
+    const score = prediction ? `${prediction.home_goals} x ${prediction.away_goals}` : "N/A";
+    return `${profile.display_name} - ${score}`;
   });
-
-  return lines.length > 0 ? lines : ["Sem palpites registrados."];
 }
 
 function limitTelegramBody(lines: string[]): string {
