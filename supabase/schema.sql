@@ -117,6 +117,26 @@ create table if not exists public.daily_prediction_reports (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.match_prediction_reports (
+  id uuid primary key default gen_random_uuid(),
+  match_id uuid not null unique references public.matches(id) on delete cascade,
+  lock_deadline_at timestamptz not null,
+  locked_at timestamptz,
+  report_generated_at timestamptz,
+  report_sent_at timestamptz,
+  report_url text,
+  report_csv text,
+  report_json jsonb,
+  telegram_message_id text,
+  telegram_chat_id text,
+  status text not null default 'pending' check (
+    status in ('pending', 'generated', 'sent', 'error', 'skipped')
+  ),
+  error_message text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.predictions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -132,6 +152,12 @@ alter table public.daily_prediction_reports
   add column if not exists telegram_message_id text;
 
 alter table public.daily_prediction_reports
+  add column if not exists telegram_chat_id text;
+
+alter table public.match_prediction_reports
+  add column if not exists telegram_message_id text;
+
+alter table public.match_prediction_reports
   add column if not exists telegram_chat_id text;
 
 create or replace function public.touch_updated_at()
@@ -162,6 +188,12 @@ before update on public.daily_prediction_reports
 for each row
 execute function public.touch_updated_at();
 
+drop trigger if exists trg_match_prediction_reports_updated_at on public.match_prediction_reports;
+create trigger trg_match_prediction_reports_updated_at
+before update on public.match_prediction_reports
+for each row
+execute function public.touch_updated_at();
+
 create or replace function public.predictions_are_open_for_match(target_match_id uuid)
 returns boolean
 language sql
@@ -175,12 +207,7 @@ as $$
     where m.id = target_match_id
       and m.is_closed = false
       and m.predictions_closed_at is null
-      and now() < (
-        select min(m2.kickoff_at) - interval '1 hour'
-        from public.matches m2
-        where (m2.kickoff_at at time zone 'America/Sao_Paulo')::date =
-          (m.kickoff_at at time zone 'America/Sao_Paulo')::date
-      )
+      and now() < (m.kickoff_at - interval '1 hour')
   );
 $$;
 
@@ -188,6 +215,7 @@ alter table public.profiles enable row level security;
 alter table public.matches enable row level security;
 alter table public.predictions enable row level security;
 alter table public.daily_prediction_reports enable row level security;
+alter table public.match_prediction_reports enable row level security;
 
 drop policy if exists "profiles_select_all_authenticated" on public.profiles;
 create policy "profiles_select_all_authenticated"
@@ -243,6 +271,20 @@ with check (
 drop policy if exists "daily_prediction_reports_admin_select" on public.daily_prediction_reports;
 create policy "daily_prediction_reports_admin_select"
 on public.daily_prediction_reports
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.is_admin = true
+  )
+);
+
+drop policy if exists "match_prediction_reports_admin_select" on public.match_prediction_reports;
+create policy "match_prediction_reports_admin_select"
+on public.match_prediction_reports
 for select
 to authenticated
 using (

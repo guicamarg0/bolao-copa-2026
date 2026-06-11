@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { processDailyPredictionLock } from "@/lib/daily-prediction-report";
+import { processMatchPredictionLocks } from "@/lib/match-prediction-report";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await processDailyPredictionLock(client);
+    const result = await processMatchPredictionLocks(client);
     const status = result.status === "error" ? 500 : 200;
     return NextResponse.json({ ok: result.status !== "error", ...result }, { status });
   } catch (error) {

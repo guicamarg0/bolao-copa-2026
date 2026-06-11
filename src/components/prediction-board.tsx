@@ -147,10 +147,10 @@ export function PredictionBoard({
       }
 
       if (statusFilter === "open") {
-        return !isPredictionLocked(match, undefined, orderedMatches);
+        return !isPredictionLocked(match);
       }
       if (statusFilter === "closed") {
-        return isPredictionLocked(match, undefined, orderedMatches);
+        return isPredictionLocked(match);
       }
       return true;
     });
@@ -180,7 +180,7 @@ export function PredictionBoard({
 
   const predictionHistory = useMemo(() => {
     return orderedMatches
-      .filter((match) => isPredictionLocked(match, undefined, orderedMatches))
+      .filter((match) => isPredictionLocked(match))
       .map((match) => ({
         match,
         prediction: predictionsByMatch[match.id],
@@ -230,7 +230,7 @@ export function PredictionBoard({
       return;
     }
 
-    if (isPredictionLocked(match, undefined, orderedMatches)) {
+    if (isPredictionLocked(match)) {
       pushToast("Palpite fora do horario: jogo bloqueado.", "error");
       return;
     }
@@ -333,7 +333,7 @@ export function PredictionBoard({
   }
 
   const openMatches = orderedMatches.filter(
-    (match) => !isPredictionLocked(match, undefined, orderedMatches),
+    (match) => !isPredictionLocked(match),
   ).length;
   const closedMatches = orderedMatches.length - openMatches;
 
@@ -448,7 +448,7 @@ export function PredictionBoard({
             ) : (
               paginatedMatches.map((match, index) => {
                 const finished = isMatchFinished(match);
-                const locked = isPredictionLocked(match, undefined, orderedMatches);
+                const locked = isPredictionLocked(match);
                 const draft = drafts[match.id] ?? { homeGoals: "0", awayGoals: "0" };
                 const homeGoals = toDisplayGoals(draft.homeGoals);
                 const awayGoals = toDisplayGoals(draft.awayGoals);
@@ -616,14 +616,14 @@ export function PredictionBoard({
                         tone={
                           isMatchFinished(match)
                             ? "game_finished"
-                            : isPredictionLocked(match, undefined, orderedMatches)
+                            : isPredictionLocked(match)
                               ? "bet_closed"
                               : "bet_open"
                         }
                       >
                         {isMatchFinished(match)
                           ? "Jogo finalizado"
-                          : isPredictionLocked(match, undefined, orderedMatches)
+                          : isPredictionLocked(match)
                             ? "Palpites fechados"
                             : "Palpites em aberto"}
                       </Badge>

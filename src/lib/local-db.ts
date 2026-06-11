@@ -722,18 +722,7 @@ export function upsertLocalPrediction(params: {
   }
 
   const match = mapMatchRow(matchRow);
-  const dayMatches = getLocalMatches().filter((candidate) => {
-    const candidateDate = new Date(
-      new Date(candidate.kickoffAt).getTime() - 3 * 60 * 60 * 1000,
-    )
-      .toISOString()
-      .slice(0, 10);
-    const matchDate = new Date(new Date(match.kickoffAt).getTime() - 3 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
-    return candidateDate === matchDate;
-  });
-  if (isPredictionLocked(match, undefined, dayMatches)) {
+  if (isPredictionLocked(match)) {
     throw new Error("O jogo jÃ¡ estÃ¡ bloqueado para palpites.");
   }
 

@@ -611,16 +611,7 @@ export async function upsertPostgresPrediction(params: {
   }
 
   const match = mapMatchRow(matchRow);
-  const dayMatchesResult = await pool.query<PostgresMatchRow>(
-    `
-      SELECT *
-      FROM public.matches
-      WHERE (kickoff_at AT TIME ZONE 'America/Sao_Paulo')::date =
-        ($1::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date
-    `,
-    [match.kickoffAt],
-  );
-  if (isPredictionLocked(match, undefined, dayMatchesResult.rows.map(mapMatchRow))) {
+  if (isPredictionLocked(match)) {
     throw new Error("O jogo jÃ¡ estÃ¡ bloqueado para palpites.");
   }
 
