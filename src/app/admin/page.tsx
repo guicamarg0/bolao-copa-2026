@@ -19,6 +19,7 @@ import {
   setAppUserActive,
   setAppUserAdmin,
   upsertAppMatchByNumber,
+  updateAppUserCredentials,
 } from "@/lib/app-db";
 import { getMatches, getProfiles } from "@/lib/data";
 import { parseMatchesCsv } from "@/lib/match-csv";
@@ -26,6 +27,7 @@ import { notifyFinishedMatchResult } from "@/lib/match-prediction-report";
 import { STAGE_LABEL } from "@/lib/match-ui";
 import { getStorageMode } from "@/lib/storage-mode";
 import { isSupabaseConfigured } from "@/lib/supabase-env";
+import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { WORLD_CUP_2026_TEAMS } from "@/lib/teams";
 import type { Match, MatchStage } from "@/lib/types";
@@ -489,6 +491,57 @@ async function updateAccountStatus(formData: FormData) {
   revalidatePath("/admin");
 }
 
+async function resetAccountPassword(formData: FormData) {
+  "use server";
+
+  const userId = String(formData.get("user_id") ?? "");
+  const username = String(formData.get("username") ?? "").trim();
+  const nextPassword = String(formData.get("password") ?? "").trim();
+  const confirmPassword = String(formData.get("confirm_password") ?? "").trim();
+
+  let destination = "/admin?password_reset=1";
+
+  try {
+    if (!userId || !username) {
+      throw new Error("Usuario invalido.");
+    }
+    if (nextPassword.length < 6) {
+      throw new Error("A nova senha deve ter ao menos 6 caracteres.");
+    }
+    if (nextPassword !== confirmPassword) {
+      throw new Error("A confirmacao da senha nao confere.");
+    }
+
+    if (isSupabaseConfigured()) {
+      await requireSupabaseAdmin();
+      const adminClient = getSupabaseAdminClient();
+      if (!adminClient) {
+        throw new Error("Configure SUPABASE_SERVICE_ROLE_KEY para resetar senhas.");
+      }
+
+      const { error } = await adminClient.auth.admin.updateUserById(userId, {
+        password: nextPassword,
+      });
+      if (error) {
+        throw error;
+      }
+    } else {
+      await requireAppAdmin();
+      await updateAppUserCredentials({
+        userId,
+        username,
+        password: nextPassword,
+      });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Falha ao redefinir senha.";
+    destination = `/admin?password_error=${encodeURIComponent(message)}`;
+  }
+
+  revalidatePath("/admin");
+  redirect(destination);
+}
+
 export default async function AdminPage({
   searchParams,
 }: {
@@ -503,6 +556,8 @@ export default async function AdminPage({
     score_group?: string;
     score_round?: string;
     score_page?: string;
+    password_reset?: string;
+    password_error?: string;
   }>;
 }) {
   const viewer = await requireAuthenticatedViewer();
@@ -518,6 +573,8 @@ export default async function AdminPage({
   const csvUpdated = toSafeCount(query.csv_updated);
   const csvSkipped = toSafeCount(query.csv_skipped);
   const csvError = toSafeQueryValue(query.csv_error);
+  const passwordReset = toSafeQueryValue(query.password_reset) === "1";
+  const passwordError = toSafeQueryValue(query.password_error);
   const scoreStatus = toScoreStatusFilter(query.score_status);
   const scoreStage = toSafeQueryValue(query.score_stage) || "all";
   const scoreGroup = toSafeQueryValue(query.score_group) || "all";
@@ -627,6 +684,18 @@ export default async function AdminPage({
         {!csvDone && csvError ? (
           <Surface className="border-red-300/35 bg-red-500/15 p-3">
             <p className="text-sm text-red-100">{csvError}</p>
+          </Surface>
+        ) : null}
+
+        {passwordReset ? (
+          <Surface className="border-emerald-300/35 bg-emerald-500/15 p-3">
+            <p className="text-sm text-emerald-100">Senha redefinida com sucesso.</p>
+          </Surface>
+        ) : null}
+
+        {passwordError ? (
+          <Surface className="border-red-300/35 bg-red-500/15 p-3">
+            <p className="text-sm text-red-100">{passwordError}</p>
           </Surface>
         ) : null}
 
@@ -1054,6 +1123,42 @@ export default async function AdminPage({
                     </Button>
                   </form>
                 </div>
+                <form
+                  action={resetAccountPassword}
+                  className="grid w-full gap-2 border-t border-white/10 pt-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+                >
+                  <input type="hidden" name="user_id" value={account.id} />
+                  <input type="hidden" name="username" value={account.username} />
+                  <label className="space-y-1 text-xs uppercase tracking-wide text-slate-300">
+                    Nova senha
+                    <Input
+                      type="password"
+                      name="password"
+                      minLength={6}
+                      placeholder="******"
+                      disabled={!viewer.isAdmin}
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs uppercase tracking-wide text-slate-300">
+                    Confirmar senha
+                    <Input
+                      type="password"
+                      name="confirm_password"
+                      minLength={6}
+                      placeholder="******"
+                      disabled={!viewer.isAdmin}
+                    />
+                  </label>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    variant="danger"
+                    className="w-full sm:w-auto"
+                    disabled={!viewer.isAdmin}
+                  >
+                    Resetar senha
+                  </Button>
+                </form>
               </Surface>
             ))}
           </div>
