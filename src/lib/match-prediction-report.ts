@@ -6,6 +6,71 @@ import { getTeamInfoByName } from "@/lib/teams";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const TELEGRAM_MESSAGE_LIMIT = 3900;
+const REGIONAL_INDICATOR_OFFSET = 127397;
+
+const FIFA_TO_COUNTRY_CODE: Record<string, string> = {
+  ALG: "DZ",
+  ARG: "AR",
+  AUS: "AU",
+  AUT: "AT",
+  BEL: "BE",
+  BIH: "BA",
+  BOL: "BO",
+  BRA: "BR",
+  CAN: "CA",
+  CHI: "CL",
+  CIV: "CI",
+  CMR: "CM",
+  COD: "CD",
+  COL: "CO",
+  CPV: "CV",
+  CRC: "CR",
+  CRO: "HR",
+  CUW: "CW",
+  CZE: "CZ",
+  DEN: "DK",
+  ECU: "EC",
+  EGY: "EG",
+  ESP: "ES",
+  FRA: "FR",
+  GER: "DE",
+  GHA: "GH",
+  HAI: "HT",
+  HON: "HN",
+  IRN: "IR",
+  IRQ: "IQ",
+  ITA: "IT",
+  JAM: "JM",
+  JOR: "JO",
+  JPN: "JP",
+  KOR: "KR",
+  KSA: "SA",
+  MAR: "MA",
+  MEX: "MX",
+  NED: "NL",
+  NGA: "NG",
+  NOR: "NO",
+  NZL: "NZ",
+  PAN: "PA",
+  PAR: "PY",
+  PER: "PE",
+  POL: "PL",
+  POR: "PT",
+  QAT: "QA",
+  RSA: "ZA",
+  SEN: "SN",
+  SLV: "SV",
+  SRB: "RS",
+  SUI: "CH",
+  SWE: "SE",
+  TUN: "TN",
+  TUR: "TR",
+  UKR: "UA",
+  URU: "UY",
+  USA: "US",
+  UZB: "UZ",
+  VEN: "VE",
+};
 
 interface MatchRow {
   id: string;
@@ -104,7 +169,36 @@ function getMatchLabel(match: MatchRow): string {
 
 function formatTeamName(teamName: string): string {
   const team = getTeamInfoByName(teamName);
-  return team ? `${team.flag} ${teamName}` : teamName;
+  const flag = team ? getTelegramFlagByTeamCode(team.code) : null;
+  return flag ? `${flag} ${teamName}` : teamName;
+}
+
+function countryCodeToFlag(countryCode: string): string {
+  return countryCode
+    .toUpperCase()
+    .split("")
+    .map((letter) => String.fromCodePoint(letter.charCodeAt(0) + REGIONAL_INDICATOR_OFFSET))
+    .join("");
+}
+
+function subdivisionFlag(tag: "eng" | "sct"): string {
+  return [
+    String.fromCodePoint(0x1f3f4),
+    ...tag.split("").map((letter) => String.fromCodePoint(0xe0000 + letter.charCodeAt(0))),
+    String.fromCodePoint(0xe007f),
+  ].join("");
+}
+
+function getTelegramFlagByTeamCode(teamCode: string): string | null {
+  if (teamCode === "ENG") {
+    return subdivisionFlag("eng");
+  }
+  if (teamCode === "SCO") {
+    return subdivisionFlag("sct");
+  }
+
+  const countryCode = FIFA_TO_COUNTRY_CODE[teamCode];
+  return countryCode ? countryCodeToFlag(countryCode) : null;
 }
 
 function buildCsv(params: {
