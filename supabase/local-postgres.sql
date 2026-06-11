@@ -73,6 +73,7 @@ create table if not exists public.matches (
   home_team text not null,
   away_team text not null,
   kickoff_at timestamptz not null,
+  predictions_closed_at timestamptz,
   is_closed boolean not null default false,
   home_score integer,
   away_score integer,
@@ -90,6 +91,9 @@ alter table public.matches
 
 alter table public.matches
   add column if not exists round_number integer;
+
+alter table public.matches
+  add column if not exists predictions_closed_at timestamptz;
 
 create unique index if not exists idx_matches_match_number
   on public.matches (match_number);

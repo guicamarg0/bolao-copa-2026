@@ -69,10 +69,10 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
         return isMatchFinished(match);
       }
       if (status === "locked") {
-        return !isMatchFinished(match) && isPredictionLocked(match);
+        return !isMatchFinished(match) && isPredictionLocked(match, undefined, matches);
       }
       if (status === "open") {
-        return !isMatchFinished(match) && !isPredictionLocked(match);
+        return !isMatchFinished(match) && !isPredictionLocked(match, undefined, matches);
       }
 
       return true;
@@ -202,7 +202,7 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35 }}
               >
-                <MatchCard match={match} featured />
+                <MatchCard match={match} matches={matches} featured />
               </motion.div>
             ))}
           </div>
@@ -232,7 +232,7 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
                   transition={{ duration: 0.24, delay: index * 0.02 }}
                   className="h-full"
                 >
-                  <MatchCard match={match} />
+                  <MatchCard match={match} matches={matches} />
                 </motion.div>
               ))}
             </div>

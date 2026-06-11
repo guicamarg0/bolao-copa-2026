@@ -15,7 +15,7 @@ import type {
 export const POSTGRES_SESSION_COOKIE_NAME = "bolao_local_session";
 
 const SESSION_TTL_DAYS = 30;
-const POSTGRES_SCHEMA_VERSION = 3;
+const POSTGRES_SCHEMA_VERSION = 4;
 
 declare global {
   var __bolaoPgPool: Pool | undefined;
@@ -49,6 +49,7 @@ interface PostgresMatchRow {
   home_team: string;
   away_team: string;
   kickoff_at: string | Date;
+  predictions_closed_at: string | Date | null;
   is_closed: boolean;
   home_score: number | null;
   away_score: number | null;
@@ -174,6 +175,9 @@ function mapMatchRow(row: PostgresMatchRow): Match {
     homeTeam: row.home_team,
     awayTeam: row.away_team,
     kickoffAt: toIso(row.kickoff_at),
+    predictionsClosedAt: row.predictions_closed_at
+      ? toIso(row.predictions_closed_at)
+      : null,
     isClosed: row.is_closed,
     homeScore: row.home_score,
     awayScore: row.away_score,
@@ -289,6 +293,9 @@ async function ensureSchema() {
 
   await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS match_number integer");
   await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS round_number integer");
+  await pool.query(
+    "ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS predictions_closed_at timestamptz",
+  );
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_matches_match_number
     ON public.matches (match_number)
@@ -604,7 +611,16 @@ export async function upsertPostgresPrediction(params: {
   }
 
   const match = mapMatchRow(matchRow);
-  if (isPredictionLocked(match)) {
+  const dayMatchesResult = await pool.query<PostgresMatchRow>(
+    `
+      SELECT *
+      FROM public.matches
+      WHERE (kickoff_at AT TIME ZONE 'America/Sao_Paulo')::date =
+        ($1::timestamptz AT TIME ZONE 'America/Sao_Paulo')::date
+    `,
+    [match.kickoffAt],
+  );
+  if (isPredictionLocked(match, undefined, dayMatchesResult.rows.map(mapMatchRow))) {
     throw new Error("O jogo jÃ¡ estÃ¡ bloqueado para palpites.");
   }
 

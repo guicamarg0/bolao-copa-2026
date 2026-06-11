@@ -48,6 +48,7 @@ export interface Match {
   homeTeam: string;
   awayTeam: string;
   kickoffAt: string;
+  predictionsClosedAt?: string | null;
   isClosed: boolean;
   homeScore: number | null;
   awayScore: number | null;

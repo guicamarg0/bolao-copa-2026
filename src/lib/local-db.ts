@@ -24,7 +24,7 @@ export const LOCAL_SESSION_COOKIE_NAME = "bolao_local_session";
 
 const LOCAL_DB_PATH = path.join(process.cwd(), "supabase", "local.sqlite");
 const SESSION_TTL_DAYS = 30;
-const LOCAL_SCHEMA_VERSION = 3;
+const LOCAL_SCHEMA_VERSION = 4;
 
 declare global {
   var __bolaoLocalDb: DatabaseSync | undefined;
@@ -57,6 +57,7 @@ interface LocalMatchRow {
   home_team: string;
   away_team: string;
   kickoff_at: string;
+  predictions_closed_at: string | null;
   is_closed: number;
   home_score: number | null;
   away_score: number | null;
@@ -156,6 +157,7 @@ function mapMatchRow(row: LocalMatchRow): Match {
     homeTeam: row.home_team,
     awayTeam: row.away_team,
     kickoffAt: row.kickoff_at,
+    predictionsClosedAt: row.predictions_closed_at,
     isClosed: row.is_closed === 1,
     homeScore: row.home_score,
     awayScore: row.away_score,
@@ -206,6 +208,7 @@ function initializeSchema(db: DatabaseSync) {
       home_team TEXT NOT NULL,
       away_team TEXT NOT NULL,
       kickoff_at TEXT NOT NULL,
+      predictions_closed_at TEXT,
       is_closed INTEGER NOT NULL DEFAULT 0,
       home_score INTEGER,
       away_score INTEGER,
@@ -295,6 +298,12 @@ function initializeSchema(db: DatabaseSync) {
   const hasRoundNumber = matchColumns.some((column) => column.name === "round_number");
   if (!hasRoundNumber) {
     db.exec("ALTER TABLE local_matches ADD COLUMN round_number INTEGER");
+  }
+  const hasPredictionsClosedAt = matchColumns.some(
+    (column) => column.name === "predictions_closed_at",
+  );
+  if (!hasPredictionsClosedAt) {
+    db.exec("ALTER TABLE local_matches ADD COLUMN predictions_closed_at TEXT");
   }
   db.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_local_matches_match_number ON local_matches(match_number)",
@@ -713,7 +722,18 @@ export function upsertLocalPrediction(params: {
   }
 
   const match = mapMatchRow(matchRow);
-  if (isPredictionLocked(match)) {
+  const dayMatches = getLocalMatches().filter((candidate) => {
+    const candidateDate = new Date(
+      new Date(candidate.kickoffAt).getTime() - 3 * 60 * 60 * 1000,
+    )
+      .toISOString()
+      .slice(0, 10);
+    const matchDate = new Date(new Date(match.kickoffAt).getTime() - 3 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    return candidateDate === matchDate;
+  });
+  if (isPredictionLocked(match, undefined, dayMatches)) {
     throw new Error("O jogo jÃ¡ estÃ¡ bloqueado para palpites.");
   }
 

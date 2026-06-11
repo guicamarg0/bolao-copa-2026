@@ -13,11 +13,12 @@ interface MatchCardProps {
   match: Match;
   prediction?: Prediction;
   featured?: boolean;
+  matches?: Match[];
 }
 
-export function MatchCard({ match, prediction, featured = false }: MatchCardProps) {
+export function MatchCard({ match, prediction, featured = false, matches }: MatchCardProps) {
   const finished = isMatchFinished(match);
-  const locked = isPredictionLocked(match);
+  const locked = isPredictionLocked(match, undefined, matches);
 
   const scoreboardLabel = finished
     ? `${match.homeScore ?? "-"} × ${match.awayScore ?? "-"}`

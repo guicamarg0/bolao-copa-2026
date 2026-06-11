@@ -21,8 +21,36 @@ export function isMatchFinished(match: Match): boolean {
   return match.homeScore !== null && match.awayScore !== null;
 }
 
-export function isPredictionLocked(match: Match, now: Date = new Date()): boolean {
-  return match.isClosed || new Date(match.kickoffAt).getTime() <= now.getTime();
+function getGmtMinus3DateKey(value: Date): string {
+  const shifted = new Date(value.getTime() - 3 * 60 * 60 * 1000);
+  return shifted.toISOString().slice(0, 10);
+}
+
+export function getDailyPredictionDeadline(
+  match: Match,
+  matches: Match[] = [match],
+): Date {
+  const matchDateKey = getGmtMinus3DateKey(new Date(match.kickoffAt));
+  const sameDayMatches = matches.filter(
+    (candidate) => getGmtMinus3DateKey(new Date(candidate.kickoffAt)) === matchDateKey,
+  );
+  const firstKickoffAt = Math.min(
+    ...sameDayMatches.map((candidate) => new Date(candidate.kickoffAt).getTime()),
+  );
+
+  return new Date(firstKickoffAt - 60 * 60 * 1000);
+}
+
+export function isPredictionLocked(
+  match: Match,
+  now: Date = new Date(),
+  matches?: Match[],
+): boolean {
+  if (match.isClosed || match.predictionsClosedAt) {
+    return true;
+  }
+
+  return getDailyPredictionDeadline(match, matches).getTime() <= now.getTime();
 }
 
 export function scorePrediction(
