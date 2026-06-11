@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { Pool, type PoolClient } from "pg";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -56,6 +56,31 @@ export interface ProcessMatchPredictionLocksResult {
   processed: MatchPredictionLockResult[];
 }
 
+declare global {
+  // Reused across invocations on Vercel.
+  var __bolaoMatchReportPool: Pool | undefined;
+}
+
+function getPool(): Pool | null {
+  const connectionString = process.env.DATABASE_URL?.trim();
+  if (!connectionString) {
+    return null;
+  }
+
+  if (!globalThis.__bolaoMatchReportPool) {
+    const sslSetting = process.env.DATABASE_SSL?.trim().toLowerCase();
+    const useSsl =
+      sslSetting === "true" || (sslSetting !== "false" && connectionString.includes("supabase.co"));
+
+    globalThis.__bolaoMatchReportPool = new Pool({
+      connectionString,
+      ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+    });
+  }
+
+  return globalThis.__bolaoMatchReportPool;
+}
+
 function formatLocalDateTime(value: string | Date): string {
   return new Intl.DateTimeFormat("pt-BR", {
     timeZone: "America/Sao_Paulo",
@@ -108,32 +133,6 @@ function buildCsv(params: {
   return lines.join("\n");
 }
 
-async function uploadReport(params: {
-  client: SupabaseClient;
-  match: MatchRow;
-  reportId: string;
-  csv: string;
-}): Promise<string | null> {
-  const bucket = process.env.REPORT_STORAGE_BUCKET?.trim();
-  if (!bucket) {
-    return null;
-  }
-
-  const matchNumber = params.match.match_number ?? params.match.id;
-  const path = `palpite-jogo-${matchNumber}-${params.reportId}.csv`;
-  const { error } = await params.client.storage.from(bucket).upload(path, params.csv, {
-    contentType: "text/csv; charset=utf-8",
-    upsert: true,
-  });
-
-  if (error) {
-    throw new Error(`Falha ao salvar CSV no Storage: ${error.message}`);
-  }
-
-  const { data } = params.client.storage.from(bucket).getPublicUrl(path);
-  return data.publicUrl;
-}
-
 async function sendTelegramMessage(params: {
   match: MatchRow;
   lockDeadlineAt: string;
@@ -148,7 +147,7 @@ async function sendTelegramMessage(params: {
 
   const reportLine = params.reportUrl
     ? `Relatorio CSV: ${params.reportUrl}`
-    : "Relatorio CSV gerado e salvo no banco.";
+    : "Relatorio CSV salvo no banco.";
   const body = [
     `WorldBet 26 - Palpites fechados`,
     `Jogo: ${getMatchLabel(params.match)}`,
@@ -181,7 +180,7 @@ async function sendTelegramMessage(params: {
 }
 
 async function processMatchPredictionLock(
-  client: SupabaseClient,
+  client: PoolClient,
   match: MatchRow,
   now: Date,
 ): Promise<MatchPredictionLockResult> {
@@ -197,17 +196,17 @@ async function processMatchPredictionLock(
     };
   }
 
-  const existingResult = await client
-    .from("match_prediction_reports")
-    .select("id,match_id,report_csv,report_url,report_sent_at,telegram_message_id,status")
-    .eq("match_id", match.id)
-    .maybeSingle();
+  const existingResult = await client.query<MatchReportRow>(
+    `
+      SELECT id, match_id, report_csv, report_url, report_sent_at, telegram_message_id, status
+      FROM public.match_prediction_reports
+      WHERE match_id = $1
+      LIMIT 1
+    `,
+    [match.id],
+  );
 
-  if (existingResult.error) {
-    throw new Error(existingResult.error.message);
-  }
-
-  const existing = existingResult.data as MatchReportRow | null;
+  const existing = existingResult.rows[0] ?? null;
   if (existing?.report_sent_at) {
     return {
       status: "already_sent",
@@ -220,93 +219,87 @@ async function processMatchPredictionLock(
     };
   }
 
-  let reportId = existing?.id;
+  let reportId = existing?.id ?? null;
   let reportCsv = existing?.report_csv ?? null;
-  let reportUrl = existing?.report_url ?? null;
+  const reportUrl = existing?.report_url ?? null;
 
   if (!reportId || !reportCsv) {
     const [profilesResult, predictionsResult] = await Promise.all([
-      client
-        .from("profiles")
-        .select("id,username,display_name,email")
-        .eq("is_active", true)
-        .order("display_name", { ascending: true }),
-      client
-        .from("predictions")
-        .select("user_id,match_id,home_goals,away_goals")
-        .eq("match_id", match.id),
+      client.query<ProfileRow>(
+        `
+          SELECT id, username, display_name, email
+          FROM public.profiles
+          WHERE is_active = true
+          ORDER BY display_name ASC
+        `,
+      ),
+      client.query<PredictionRow>(
+        `
+          SELECT user_id, match_id, home_goals, away_goals
+          FROM public.predictions
+          WHERE match_id = $1
+        `,
+        [match.id],
+      ),
     ]);
-
-    if (profilesResult.error) {
-      throw new Error(profilesResult.error.message);
-    }
-    if (predictionsResult.error) {
-      throw new Error(predictionsResult.error.message);
-    }
 
     reportCsv = buildCsv({
       match,
       lockDeadlineAt: lockDeadlineAt.toISOString(),
-      profiles: (profilesResult.data ?? []) as ProfileRow[],
-      predictions: (predictionsResult.data ?? []) as PredictionRow[],
+      profiles: profilesResult.rows,
+      predictions: predictionsResult.rows,
     });
 
-    const insertResult = await client
-      .from("match_prediction_reports")
-      .insert({
-        match_id: match.id,
-        lock_deadline_at: lockDeadlineAt.toISOString(),
-        locked_at: now.toISOString(),
-        report_generated_at: now.toISOString(),
-        report_csv: reportCsv,
-        report_json: {
+    const inserted = await client.query<{ id: string }>(
+      `
+        INSERT INTO public.match_prediction_reports (
+          match_id,
+          lock_deadline_at,
+          locked_at,
+          report_generated_at,
+          report_csv,
+          report_json,
+          telegram_chat_id,
+          status
+        )
+        VALUES ($1, $2, $3, $3, $4, $5::jsonb, $6, 'generated')
+        ON CONFLICT (match_id)
+        DO UPDATE SET
+          lock_deadline_at = EXCLUDED.lock_deadline_at,
+          locked_at = EXCLUDED.locked_at,
+          report_generated_at = EXCLUDED.report_generated_at,
+          report_csv = EXCLUDED.report_csv,
+          report_json = EXCLUDED.report_json,
+          telegram_chat_id = EXCLUDED.telegram_chat_id,
+          status = 'generated'
+        RETURNING id
+      `,
+      [
+        match.id,
+        lockDeadlineAt.toISOString(),
+        now.toISOString(),
+        reportCsv,
+        JSON.stringify({
           match_id: match.id,
           match_number: match.match_number,
           home_team: match.home_team,
           away_team: match.away_team,
-        },
-        telegram_chat_id: process.env.TELEGRAM_CHAT_ID?.trim() ?? null,
-        status: "generated",
-      })
-      .select("id")
-      .maybeSingle();
+        }),
+        process.env.TELEGRAM_CHAT_ID?.trim() ?? null,
+      ],
+    );
 
-    if (insertResult.error) {
-      if (insertResult.error.code === "23505") {
-        return processMatchPredictionLock(client, match, now);
-      }
-      throw new Error(insertResult.error.message);
-    }
+    reportId = inserted.rows[0]?.id ?? reportId;
 
-    if (!insertResult.data?.id) {
-      throw new Error("Relatorio criado sem id retornado.");
-    }
-
-    reportId = String(insertResult.data.id);
-
-    const updateMatchResult = await client
-      .from("matches")
-      .update({ predictions_closed_at: now.toISOString() })
-      .eq("id", match.id)
-      .is("predictions_closed_at", null);
-
-    if (updateMatchResult.error) {
-      throw new Error(updateMatchResult.error.message);
-    }
-
-    reportUrl = await uploadReport({
-      client,
-      match,
-      reportId,
-      csv: reportCsv,
-    });
-
-    if (reportUrl) {
-      await client
-        .from("match_prediction_reports")
-        .update({ report_url: reportUrl })
-        .eq("id", reportId);
-    }
+    await client.query(
+      `
+        UPDATE public.matches
+        SET predictions_closed_at = $1
+        WHERE id = $2
+          AND predictions_closed_at IS NULL
+      `,
+      [now.toISOString(), match.id],
+    );
   }
 
   if (!reportId || !reportCsv) {
@@ -320,19 +313,26 @@ async function processMatchPredictionLock(
       reportUrl,
     });
 
-    const sentAt = telegramMessageId ? now.toISOString() : null;
-    await client
-      .from("match_prediction_reports")
-      .update({
-        report_sent_at: sentAt,
-        telegram_message_id: telegramMessageId,
-        report_url: reportUrl,
-        status: telegramMessageId ? "sent" : "generated",
-        error_message: telegramMessageId
-          ? null
-          : "Telegram nao configurado; relatorio gerado sem envio.",
-      })
-      .eq("id", reportId);
+    await client.query(
+      `
+        UPDATE public.match_prediction_reports
+        SET
+          report_sent_at = $1,
+          telegram_message_id = $2,
+          report_url = $3,
+          status = $4,
+          error_message = $5
+        WHERE id = $6
+      `,
+      [
+        telegramMessageId ? now.toISOString() : null,
+        telegramMessageId,
+        reportUrl,
+        telegramMessageId ? "sent" : "generated",
+        telegramMessageId ? null : "Telegram nao configurado; relatorio gerado sem envio.",
+        reportId,
+      ],
+    );
 
     return {
       status: telegramMessageId ? "sent" : "generated",
@@ -347,14 +347,14 @@ async function processMatchPredictionLock(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha ao enviar Telegram.";
-    await client
-      .from("match_prediction_reports")
-      .update({
-        status: "error",
-        error_message: message,
-        report_url: reportUrl,
-      })
-      .eq("id", reportId);
+    await client.query(
+      `
+        UPDATE public.match_prediction_reports
+        SET status = 'error', error_message = $1, report_url = $2
+        WHERE id = $3
+      `,
+      [message, reportUrl, reportId],
+    );
 
     return {
       status: "error",
@@ -368,41 +368,54 @@ async function processMatchPredictionLock(
 }
 
 export async function processMatchPredictionLocks(
-  client: SupabaseClient,
+  _unusedClient: unknown,
   now: Date = new Date(),
 ): Promise<ProcessMatchPredictionLocksResult> {
-  const dueUntil = new Date(now.getTime() + ONE_HOUR_MS).toISOString();
-  const matchesResult = await client
-    .from("matches")
-    .select("id,stage,group_name,match_number,round_number,home_team,away_team,kickoff_at,venue")
-    .lte("kickoff_at", dueUntil)
-    .is("predictions_closed_at", null)
-    .eq("is_closed", false)
-    .order("kickoff_at", { ascending: true })
-    .limit(12);
-
-  if (matchesResult.error) {
-    throw new Error(matchesResult.error.message);
-  }
-
-  const matches = (matchesResult.data ?? []) as MatchRow[];
-  if (matches.length === 0) {
+  const pool = getPool();
+  if (!pool) {
     return {
-      status: "no_matches",
-      message: "Nenhum jogo pendente de fechamento.",
+      status: "error",
+      message: "Configure DATABASE_URL para executar o cron sem Supabase API keys.",
       processed: [],
     };
   }
 
-  const processed: MatchPredictionLockResult[] = [];
-  for (const match of matches) {
-    processed.push(await processMatchPredictionLock(client, match, now));
-  }
+  const client = await pool.connect();
+  try {
+    const dueUntil = new Date(now.getTime() + ONE_HOUR_MS).toISOString();
+    const matchesResult = await client.query<MatchRow>(
+      `
+        SELECT id, stage, group_name, match_number, round_number, home_team, away_team, kickoff_at, venue
+        FROM public.matches
+        WHERE kickoff_at <= $1
+          AND predictions_closed_at IS NULL
+          AND is_closed = false
+        ORDER BY kickoff_at ASC
+        LIMIT 12
+      `,
+      [dueUntil],
+    );
 
-  const hasError = processed.some((result) => result.status === "error");
-  return {
-    status: hasError ? "error" : "processed",
-    message: `${processed.length} jogo(s) processado(s).`,
-    processed,
-  };
+    if (matchesResult.rows.length === 0) {
+      return {
+        status: "no_matches",
+        message: "Nenhum jogo pendente de fechamento.",
+        processed: [],
+      };
+    }
+
+    const processed: MatchPredictionLockResult[] = [];
+    for (const match of matchesResult.rows) {
+      processed.push(await processMatchPredictionLock(client, match, now));
+    }
+
+    const hasError = processed.some((result) => result.status === "error");
+    return {
+      status: hasError ? "error" : "processed",
+      message: `${processed.length} jogo(s) processado(s).`,
+      processed,
+    };
+  } finally {
+    client.release();
+  }
 }

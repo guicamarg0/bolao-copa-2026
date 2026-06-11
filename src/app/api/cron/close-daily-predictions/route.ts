@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { processMatchPredictionLocks } from "@/lib/match-prediction-report";
-import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,20 +23,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const client = getSupabaseAdminClient();
-  if (!client) {
-    return NextResponse.json(
-      {
-        ok: false,
-        status: "not_configured",
-        error: "Configure NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY e Supabase.",
-      },
-      { status: 503 },
-    );
-  }
-
   try {
-    const result = await processMatchPredictionLocks(client);
+    const result = await processMatchPredictionLocks(undefined);
     const status = result.status === "error" ? 500 : 200;
     return NextResponse.json({ ok: result.status !== "error", ...result }, { status });
   } catch (error) {
