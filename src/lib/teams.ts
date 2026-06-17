@@ -212,7 +212,11 @@ export const WORLD_CUP_2026_TEAMS: TeamInfo[] = [
   { code: TeamCode.VENEZUELA, name: "Venezuela", flag: "🇻🇪" },
 ];
 
-function normalizeTeamKey(value: string): string {
+function normalizeTeamKey(value: string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+
   return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -317,8 +321,12 @@ for (const [alias, code] of Object.entries(TEAM_ALIASES)) {
   }
 }
 
-export function getTeamInfoByName(name: string): TeamInfo | null {
+export function getTeamInfoByName(name: string | null | undefined): TeamInfo | null {
   const key = normalizeTeamKey(name);
+  if (!key) {
+    return null;
+  }
+
   return TEAM_BY_NORMALIZED_NAME.get(key) ?? null;
 }
 
@@ -331,7 +339,7 @@ export function getTeamFlagAsset(team: TeamInfo): TeamFlagAsset {
   };
 }
 
-export function getTeamFlagAssetByName(name: string): TeamFlagAsset | null {
+export function getTeamFlagAssetByName(name: string | null | undefined): TeamFlagAsset | null {
   const team = getTeamInfoByName(name);
   return team ? getTeamFlagAsset(team) : null;
 }

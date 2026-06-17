@@ -14,8 +14,8 @@ const MAX_MATCHES_PER_SYNC = 20;
 interface LocalMatchRow {
   id: string;
   match_number: number | null;
-  home_team: string;
-  away_team: string;
+  home_team: string | null;
+  away_team: string | null;
   kickoff_at: string;
   external_match_id: string | null;
 }
@@ -35,8 +35,8 @@ interface FootballDataMatch {
   matchday?: number | null;
   stage?: string | null;
   group?: string | null;
-  homeTeam: FootballDataTeam;
-  awayTeam: FootballDataTeam;
+  homeTeam?: FootballDataTeam | null;
+  awayTeam?: FootballDataTeam | null;
   score?: {
     fullTime?: {
       home?: number | null;
@@ -130,11 +130,15 @@ async function footballDataRequest<T>(
   };
 }
 
-function getTeamCodeFromName(name: string): string | null {
+function getTeamCodeFromName(name: string | null | undefined): string | null {
   return getTeamInfoByName(name)?.code ?? null;
 }
 
-function getTeamCodeFromApiTeam(team: FootballDataTeam): string | null {
+function getTeamCodeFromApiTeam(team: FootballDataTeam | null | undefined): string | null {
+  if (!team) {
+    return null;
+  }
+
   if (team.tla?.trim()) {
     return team.tla.trim().toUpperCase();
   }

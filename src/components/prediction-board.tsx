@@ -122,7 +122,6 @@ export function PredictionBoard({
   );
   const [savingMatchId, setSavingMatchId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "closed">("all");
   const [groupFilter, setGroupFilter] = useState<"all" | string>("all");
   const [roundFilter, setRoundFilter] = useState<"all" | string>("all");
   const [page, setPage] = useState(1);
@@ -134,8 +133,14 @@ export function PredictionBoard({
     );
   }, [matches]);
 
+  const openOrderedMatches = useMemo(() => {
+    return orderedMatches.filter(
+      (match) => !isPredictionLocked(match) && !isMatchFinished(match),
+    );
+  }, [orderedMatches]);
+
   const filteredMatches = useMemo(() => {
-    return orderedMatches.filter((match) => {
+    return openOrderedMatches.filter((match) => {
       if (groupFilter !== "all" && match.groupName !== groupFilter) {
         return false;
       }
@@ -146,19 +151,13 @@ export function PredictionBoard({
         return false;
       }
 
-      if (statusFilter === "open") {
-        return !isPredictionLocked(match);
-      }
-      if (statusFilter === "closed") {
-        return isPredictionLocked(match);
-      }
       return true;
     });
-  }, [groupFilter, orderedMatches, roundFilter, statusFilter]);
+  }, [groupFilter, openOrderedMatches, roundFilter]);
 
   const groupOptions = useMemo(() => {
     const unique = new Set(
-      orderedMatches
+      openOrderedMatches
         .map((match) => match.groupName)
         .filter((group): group is string => Boolean(group)),
     );
@@ -166,27 +165,17 @@ export function PredictionBoard({
     return Array.from(unique.values()).sort((left, right) =>
       left.localeCompare(right, "pt-BR", { numeric: true, sensitivity: "base" }),
     );
-  }, [orderedMatches]);
+  }, [openOrderedMatches]);
 
   const roundOptions = useMemo(() => {
     const unique = new Set(
-      orderedMatches
+      openOrderedMatches
         .map((match) => match.roundNumber)
         .filter((round): round is number => Number.isInteger(round)),
     );
 
     return Array.from(unique.values()).sort((left, right) => left - right);
-  }, [orderedMatches]);
-
-  const predictionHistory = useMemo(() => {
-    return orderedMatches
-      .filter((match) => isPredictionLocked(match))
-      .map((match) => ({
-        match,
-        prediction: predictionsByMatch[match.id],
-      }))
-      .filter((entry) => Boolean(entry.prediction));
-  }, [orderedMatches, predictionsByMatch]);
+  }, [openOrderedMatches]);
 
   const totalPages = Math.max(1, Math.ceil(filteredMatches.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -332,10 +321,11 @@ export function PredictionBoard({
     }
   }
 
-  const openMatches = orderedMatches.filter(
-    (match) => !isPredictionLocked(match),
+  const openMatches = openOrderedMatches.length;
+  const savedOpenPredictions = openOrderedMatches.filter(
+    (match) => predictionsByMatch[match.id],
   ).length;
-  const closedMatches = orderedMatches.length - openMatches;
+  const nextOpenMatch = openOrderedMatches[0] ?? null;
 
   return (
     <section className="space-y-5">
@@ -358,33 +348,21 @@ export function PredictionBoard({
               <p className="font-display text-4xl leading-none md:text-5xl">{openMatches}</p>
             </Surface>
             <Surface className="p-4">
-              <p className="text-xs uppercase tracking-wide text-slate-300">Partidas fechadas</p>
-              <p className="font-display text-4xl leading-none md:text-5xl">{closedMatches}</p>
+              <p className="text-xs uppercase tracking-wide text-slate-300">Palpites abertos salvos</p>
+              <p className="font-display text-4xl leading-none md:text-5xl">
+                {savedOpenPredictions}
+              </p>
             </Surface>
             <Surface className="p-4">
-              <p className="text-xs uppercase tracking-wide text-slate-300">Palpites salvos</p>
-              <p className="font-display text-4xl leading-none md:text-5xl">
-                {Object.keys(predictionsByMatch).length}
+              <p className="text-xs uppercase tracking-wide text-slate-300">Proximo jogo aberto</p>
+              <p className="font-display text-xl leading-tight md:text-2xl">
+                {nextOpenMatch ? formatKickoffDate(nextOpenMatch.kickoffAt) : "-"}
               </p>
             </Surface>
           </div>
 
           <div className="rounded-xl border border-[var(--wb-border)] bg-white p-4 shadow-[0_10px_24px_rgba(7,29,73,0.06)]">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
-              <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
-                Exibir partidas
-                <Select
-                  value={statusFilter}
-                  onChange={(event) => {
-                    setStatusFilter(event.target.value as "all" | "open" | "closed");
-                    setPage(1);
-                  }}
-                >
-                  <option value="all">Todas</option>
-                  <option value="open">Palpites em aberto</option>
-                  <option value="closed">Palpites fechados/finalizados</option>
-                </Select>
-              </label>
+            <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
               <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
                 Grupo
                 <Select
@@ -426,7 +404,6 @@ export function PredictionBoard({
                   size="sm"
                   className="w-full md:w-auto"
                   onClick={() => {
-                    setStatusFilter("all");
                     setGroupFilter("all");
                     setRoundFilter("all");
                     setPage(1);
@@ -442,7 +419,7 @@ export function PredictionBoard({
             {paginatedMatches.length === 0 ? (
               <Surface className="p-6 text-center lg:col-span-2">
                 <p className="text-sm text-slate-300">
-                  Nenhum jogo encontrado para o filtro selecionado.
+                  Nenhum jogo em aberto encontrado para o filtro selecionado.
                 </p>
               </Surface>
             ) : (
@@ -570,7 +547,7 @@ export function PredictionBoard({
 
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
             <p className="text-slate-300">
-              Pagina {currentPage} de {totalPages} | {filteredMatches.length} jogos
+              Pagina {currentPage} de {totalPages} | {filteredMatches.length} jogos em aberto
             </p>
             <div className="flex w-full gap-2 sm:w-auto">
               <Button
@@ -596,59 +573,6 @@ export function PredictionBoard({
               </Button>
             </div>
           </div>
-
-          <section className="space-y-3">
-            <h2 className="font-display text-2xl uppercase tracking-[0.08em] text-white">
-              Historico de palpites (jogos fechados)
-            </h2>
-            {predictionHistory.length === 0 ? (
-              <Surface className="p-6 text-center">
-                <p className="text-sm text-slate-300">
-                  Seus palpites fechados aparecerao aqui conforme os jogos iniciarem.
-                </p>
-              </Surface>
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                {predictionHistory.map(({ match, prediction }) => (
-                  <Surface key={`history-${match.id}`} className="p-4">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <Badge
-                        tone={
-                          isMatchFinished(match)
-                            ? "game_finished"
-                            : isPredictionLocked(match)
-                              ? "bet_closed"
-                              : "bet_open"
-                        }
-                      >
-                        {isMatchFinished(match)
-                          ? "Jogo finalizado"
-                          : isPredictionLocked(match)
-                            ? "Palpites fechados"
-                            : "Palpites em aberto"}
-                      </Badge>
-                      <span className="text-xs text-slate-400">
-                        {formatKickoffDate(match.kickoffAt)}
-                      </span>
-                    </div>
-                    <p className="mb-2 text-xs uppercase tracking-wide text-slate-300">
-                      {match.groupName ? `Grupo ${match.groupName}` : "Mata-mata"}
-                      {typeof match.roundNumber === "number"
-                        ? ` | Rodada ${match.roundNumber}`
-                        : ""}
-                    </p>
-                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                      <TeamPill teamName={match.homeTeam} />
-                      <span className="font-display text-2xl">
-                        {prediction?.homeGoals ?? "-"} x {prediction?.awayGoals ?? "-"}
-                      </span>
-                      <TeamPill teamName={match.awayTeam} align="right" />
-                    </div>
-                  </Surface>
-                ))}
-              </div>
-            )}
-          </section>
         </>
       ) : null}
     </section>

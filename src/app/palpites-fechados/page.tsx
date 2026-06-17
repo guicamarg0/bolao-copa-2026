@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { TeamPill } from "@/components/team-pill";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +7,8 @@ import { requireAuthenticatedViewer } from "@/lib/auth-guard";
 import { getMatches, getPredictions, getProfiles } from "@/lib/data";
 import { isMatchFinished, isPredictionLocked, scorePrediction } from "@/lib/scoring";
 import type { Match, Prediction, Profile } from "@/lib/types";
+
+const PAGE_SIZE = 1;
 
 function formatKickoffDate(value: string): string {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -47,11 +50,28 @@ function sortProfiles(profiles: Profile[]): Profile[] {
         numeric: true,
         sensitivity: "base",
       }),
-    );
+  );
 }
 
-export default async function PalpitesFechadosPage() {
+function clampPage(page: number, totalPages: number): number {
+  if (!Number.isFinite(page) || page < 1) {
+    return totalPages;
+  }
+
+  return Math.min(page, totalPages);
+}
+
+function getPageHref(page: number): string {
+  return `/palpites-fechados?page=${page}`;
+}
+
+export default async function PalpitesFechadosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const viewer = await requireAuthenticatedViewer();
+  const query = await searchParams;
   const [matches, profiles, predictions] = await Promise.all([
     getMatches(),
     getProfiles(),
@@ -69,8 +89,19 @@ export default async function PalpitesFechadosPage() {
     .filter((match) => isPredictionLocked(match))
     .sort(
       (left, right) =>
-        new Date(right.kickoffAt).getTime() - new Date(left.kickoffAt).getTime(),
+        new Date(left.kickoffAt).getTime() - new Date(right.kickoffAt).getTime(),
     );
+  const lockedMatchIds = new Set(lockedMatches.map((match) => match.id));
+  const lockedPredictionsCount = predictions.filter((prediction) =>
+    lockedMatchIds.has(prediction.matchId),
+  ).length;
+  const totalPages = Math.max(1, Math.ceil(lockedMatches.length / PAGE_SIZE));
+  const requestedPage = query.page ? Number.parseInt(query.page, 10) : totalPages;
+  const currentPage = clampPage(requestedPage, totalPages);
+  const visibleMatches = lockedMatches.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   return (
     <AppShell
@@ -95,7 +126,7 @@ export default async function PalpitesFechadosPage() {
           <Surface className="p-4">
             <p className="text-xs uppercase tracking-wide text-slate-300">Palpites salvos</p>
             <p className="font-display text-4xl leading-none md:text-5xl">
-              {predictions.length}
+              {lockedPredictionsCount}
             </p>
           </Surface>
         </div>
@@ -111,7 +142,42 @@ export default async function PalpitesFechadosPage() {
           </Surface>
         ) : (
           <div className="space-y-4">
-            {lockedMatches.map((match) => (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--wb-border)] bg-white px-3 py-2 text-sm shadow-[0_10px_24px_rgba(7,29,73,0.06)]">
+              <p className="text-[var(--wb-muted)]">
+                Jogo {currentPage} de {totalPages} | exibindo do mais recente para o mais antigo
+              </p>
+              <div className="flex w-full gap-2 sm:w-auto">
+                {currentPage <= 1 ? (
+                  <span className="inline-flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--wb-border)] px-3 text-xs font-semibold text-[var(--wb-muted)] opacity-50 sm:flex-none">
+                    Mais antigo
+                  </span>
+                ) : (
+                  <Link
+                    href={getPageHref(currentPage - 1)}
+                    className="inline-flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--wb-border)] px-3 text-xs font-semibold text-[var(--wb-primary)] transition hover:bg-[#eef4ff] sm:flex-none"
+                  >
+                    Mais antigo
+                  </Link>
+                )}
+                <span className="inline-flex min-w-[48px] items-center justify-center rounded-lg border border-[var(--wb-border)] bg-[var(--wb-primary)] px-3 py-1.5 font-semibold text-white">
+                  {currentPage}
+                </span>
+                {currentPage >= totalPages ? (
+                  <span className="inline-flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--wb-border)] px-3 text-xs font-semibold text-[var(--wb-muted)] opacity-50 sm:flex-none">
+                    Mais recente
+                  </span>
+                ) : (
+                  <Link
+                    href={getPageHref(currentPage + 1)}
+                    className="inline-flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--wb-border)] px-3 text-xs font-semibold text-[var(--wb-primary)] transition hover:bg-[#eef4ff] sm:flex-none"
+                  >
+                    Mais recente
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {visibleMatches.map((match) => (
               <Surface key={match.id} className="p-4 md:p-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-2">
