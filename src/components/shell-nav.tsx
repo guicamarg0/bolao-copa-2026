@@ -7,6 +7,7 @@ import { useState } from "react";
 import {
   FiBarChart2,
   FiCalendar,
+  FiClock,
   FiGrid,
   FiMenu,
   FiSettings,
@@ -22,6 +23,7 @@ export type ShellIconKey =
   | "dashboard"
   | "matches"
   | "predictions"
+  | "history"
   | "rankings"
   | "profile"
   | "settings"
@@ -44,6 +46,7 @@ const iconMap: Record<ShellIconKey, React.ComponentType<{ className?: string }>>
   dashboard: FiGrid,
   matches: FiCalendar,
   predictions: FiTarget,
+  history: FiClock,
   rankings: FiBarChart2,
   profile: FiUser,
   settings: FiSettings,

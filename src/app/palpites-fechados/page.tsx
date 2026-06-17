@@ -159,7 +159,7 @@ export default async function PalpitesFechadosPage({
                     Mais antigo
                   </Link>
                 )}
-                <span className="inline-flex min-w-[48px] items-center justify-center rounded-lg border border-[var(--wb-border)] bg-[var(--wb-primary)] px-3 py-1.5 font-semibold text-white">
+                <span className="wb-dark-panel inline-flex min-w-[48px] items-center justify-center rounded-lg border border-[var(--wb-border)] bg-[var(--wb-primary)] px-3 py-1.5 font-semibold text-white">
                   {currentPage}
                 </span>
                 {currentPage >= totalPages ? (

@@ -225,8 +225,8 @@ export function PredictionBoard({
     }
 
     const draft = drafts[match.id];
-    const homeGoals = Number(draft?.homeGoals);
-    const awayGoals = Number(draft?.awayGoals);
+    const homeGoals = toDisplayGoals(draft?.homeGoals);
+    const awayGoals = toDisplayGoals(draft?.awayGoals);
 
     if (!Number.isInteger(homeGoals) || !Number.isInteger(awayGoals)) {
       pushToast("Informe numeros inteiros para os dois placares.", "error");
@@ -485,7 +485,7 @@ export function PredictionBoard({
 
                           <div className="flex flex-col items-center justify-center">
                             <span className="hidden h-10 w-px bg-[var(--wb-border)] md:block md:h-14" />
-                            <span className="my-1 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--wb-primary)] bg-[var(--wb-primary)] font-display text-4xl leading-none text-white md:h-14 md:w-14">
+                            <span className="wb-dark-panel my-1 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--wb-primary)] bg-[var(--wb-primary)] font-display text-4xl leading-none text-white md:h-14 md:w-14">
                               VS
                             </span>
                             <span className="hidden h-10 w-px bg-[var(--wb-border)] md:block md:h-14" />

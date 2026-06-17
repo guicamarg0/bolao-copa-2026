@@ -73,6 +73,9 @@ body {
   color: white !important;
 }
 
+.wb-dark-panel[class*="text-white"],
+.wb-dark-panel[class*="text-slate-100"],
+.wb-dark-panel[class*="text-slate-200"],
 .wb-dark-panel :where(.text-white, .text-slate-100, .text-slate-200),
 .wb-dark-panel [class*="text-white"] {
   color: var(--wb-ice) !important;

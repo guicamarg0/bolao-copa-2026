@@ -15,6 +15,7 @@ const navItems: ShellNavItem[] = [
   { href: "/palpites", label: "Palpites", icon: "predictions" },
   { href: "/palpites-fechados", label: "Palpites Fechados", icon: "predictions" },
   { href: "/ranking", label: "Rankings", icon: "rankings" },
+  { href: "/historico", label: "Historico", icon: "history" },
   { href: "/perfil", label: "Meu Perfil", icon: "profile" },
   { href: "/configuracoes", label: "Configurações", icon: "settings" },
   { href: "/admin", label: "Painel Admin", icon: "admin" },
