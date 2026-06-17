@@ -1,5 +1,6 @@
-﻿import { cn } from "@/lib/cn";
-import { getTeamInfoByName } from "@/lib/teams";
+/* eslint-disable @next/next/no-img-element */
+import { cn } from "@/lib/cn";
+import { getTeamFlagAssetByName, getTeamInfoByName } from "@/lib/teams";
 
 interface TeamPillProps {
   teamName: string;
@@ -15,6 +16,7 @@ export function TeamPill({
   className,
 }: TeamPillProps) {
   const team = getTeamInfoByName(teamName);
+  const flag = getTeamFlagAssetByName(teamName);
   const alignment =
     align === "center"
       ? "justify-center text-center"
@@ -26,12 +28,23 @@ export function TeamPill({
     return (
       <div className={cn("flex min-w-0 items-center gap-3", alignment, className)}>
         <span
-          className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-white/25 bg-[linear-gradient(145deg,rgba(255,255,255,0.1),rgba(255,255,255,0.02))] text-3xl shadow-[0_8px_24px_rgba(10,24,47,0.45)] md:h-16 md:w-16 md:text-4xl"
+          className="inline-flex h-11 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--wb-border)] bg-white shadow-[0_6px_16px_rgba(7,29,73,0.16)] md:h-12 md:w-16"
           aria-hidden
         >
-          {team?.flag ?? "\u{1F3F3}\u{FE0F}"}
+          {flag ? (
+            <img
+              src={flag.src}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <span className="text-xs font-bold text-[var(--wb-primary)]">
+              {team?.code ?? "FIFA"}
+            </span>
+          )}
         </span>
-        <span className="text-lg font-bold leading-tight tracking-tight text-[var(--wb-ice)] md:text-[1.7rem] xl:text-[2rem]">
+        <span className="min-w-0 text-base font-bold leading-tight tracking-normal text-[var(--wb-text)] sm:text-lg md:text-xl xl:text-2xl">
           {teamName}
         </span>
       </div>
@@ -40,10 +53,24 @@ export function TeamPill({
 
   return (
     <div className={cn("flex min-w-0 items-center gap-2", alignment, className)}>
-      <span className="text-2xl leading-none md:text-[1.75rem]" aria-hidden>
-        {team?.flag ?? "\u{1F3F3}\u{FE0F}"}
+      <span
+        className="inline-flex h-5 w-7 shrink-0 items-center justify-center overflow-hidden rounded-[4px] border border-[var(--wb-border)] bg-white"
+        aria-hidden
+      >
+        {flag ? (
+          <img
+            src={flag.src}
+            alt=""
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <span className="text-[9px] font-bold text-[var(--wb-primary)]">
+            {team?.code ?? "FIFA"}
+          </span>
+        )}
       </span>
-      <span className="truncate text-sm font-semibold text-[var(--wb-ice)]">
+      <span className="truncate text-sm font-semibold text-[var(--wb-text)]">
         {teamName}
       </span>
     </div>

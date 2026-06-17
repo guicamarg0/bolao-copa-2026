@@ -6,6 +6,7 @@ import {
   createLocalUser,
   deleteLocalSession,
   getLocalAccounts,
+  getLocalAllPredictions,
   getLocalLeaderboard,
   getLocalMatches,
   getLocalPredictionsForUser,
@@ -27,6 +28,7 @@ import {
   createPostgresUser,
   deletePostgresSession,
   getPostgresAccounts,
+  getPostgresAllPredictions,
   getPostgresLeaderboard,
   getPostgresMatches,
   getPostgresPredictionsForUser,
@@ -157,6 +159,13 @@ export async function getAppPredictionsForUser(userId: string) {
     return getPostgresPredictionsForUser(userId);
   }
   return getLocalPredictionsForUser(userId);
+}
+
+export async function getAppPredictions() {
+  if (getAppStorageMode() === "postgres") {
+    return getPostgresAllPredictions();
+  }
+  return getLocalAllPredictions();
 }
 
 export async function getAppLeaderboard() {

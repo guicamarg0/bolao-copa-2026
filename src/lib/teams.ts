@@ -70,6 +70,78 @@ export interface TeamInfo {
   flag: string;
 }
 
+export interface TeamFlagAsset {
+  src: string;
+  alt: string;
+  label: string;
+}
+
+const FLAG_ASSET_BY_TEAM_CODE: Record<TeamCode, string> = {
+  [TeamCode.AFRICA_DO_SUL]: "za",
+  [TeamCode.ALGERIA]: "dz",
+  [TeamCode.ARGENTINA]: "ar",
+  [TeamCode.ARABIA_SAUDITA]: "sa",
+  [TeamCode.AUSTRALIA]: "au",
+  [TeamCode.AUSTRIA]: "at",
+  [TeamCode.BELGIUM]: "be",
+  [TeamCode.BOLIVIA]: "bo",
+  [TeamCode.BOSNIA_HERZEGOVINA]: "ba",
+  [TeamCode.BRAZIL]: "br",
+  [TeamCode.CABO_VERDE]: "cv",
+  [TeamCode.CAMEROON]: "cm",
+  [TeamCode.CANADA]: "ca",
+  [TeamCode.CHILE]: "cl",
+  [TeamCode.COLOMBIA]: "co",
+  [TeamCode.COREIA_DO_SUL]: "kr",
+  [TeamCode.COSTA_DO_MARFIM]: "ci",
+  [TeamCode.COSTA_RICA]: "cr",
+  [TeamCode.CROATIA]: "hr",
+  [TeamCode.CURACAO]: "cw",
+  [TeamCode.CZECHIA]: "cz",
+  [TeamCode.DENMARK]: "dk",
+  [TeamCode.ESCOCIA]: "gb-sct",
+  [TeamCode.ECUADOR]: "ec",
+  [TeamCode.EGYPT]: "eg",
+  [TeamCode.EL_SALVADOR]: "sv",
+  [TeamCode.ENGLAND]: "gb-eng",
+  [TeamCode.FRANCE]: "fr",
+  [TeamCode.GERMANY]: "de",
+  [TeamCode.GHANA]: "gh",
+  [TeamCode.HAITI]: "ht",
+  [TeamCode.HONDURAS]: "hn",
+  [TeamCode.IRAN]: "ir",
+  [TeamCode.IRAQ]: "iq",
+  [TeamCode.ITALY]: "it",
+  [TeamCode.JAMAICA]: "jm",
+  [TeamCode.JAPAN]: "jp",
+  [TeamCode.JORDANIA]: "jo",
+  [TeamCode.MEXICO]: "mx",
+  [TeamCode.MOROCCO]: "ma",
+  [TeamCode.NETHERLANDS]: "nl",
+  [TeamCode.NEW_ZEALAND]: "nz",
+  [TeamCode.NIGERIA]: "ng",
+  [TeamCode.NORWAY]: "no",
+  [TeamCode.PANAMA]: "pa",
+  [TeamCode.PARAGUAY]: "py",
+  [TeamCode.PERU]: "pe",
+  [TeamCode.POLAND]: "pl",
+  [TeamCode.PORTUGAL]: "pt",
+  [TeamCode.QATAR]: "qa",
+  [TeamCode.RD_CONGO]: "cd",
+  [TeamCode.SENEGAL]: "sn",
+  [TeamCode.SERBIA]: "rs",
+  [TeamCode.SPAIN]: "es",
+  [TeamCode.SWEDEN]: "se",
+  [TeamCode.SWITZERLAND]: "ch",
+  [TeamCode.TUNISIA]: "tn",
+  [TeamCode.TURKEY]: "tr",
+  [TeamCode.UKRAINE]: "ua",
+  [TeamCode.UNITED_STATES]: "us",
+  [TeamCode.URUGUAY]: "uy",
+  [TeamCode.UZBEKISTAO]: "uz",
+  [TeamCode.VENEZUELA]: "ve",
+};
+
 export const WORLD_CUP_2026_TEAMS: TeamInfo[] = [
   { code: TeamCode.AFRICA_DO_SUL, name: "Africa do Sul", flag: "🇿🇦" },
   { code: TeamCode.ALGERIA, name: "Argelia", flag: "🇩🇿" },
@@ -248,6 +320,20 @@ for (const [alias, code] of Object.entries(TEAM_ALIASES)) {
 export function getTeamInfoByName(name: string): TeamInfo | null {
   const key = normalizeTeamKey(name);
   return TEAM_BY_NORMALIZED_NAME.get(key) ?? null;
+}
+
+export function getTeamFlagAsset(team: TeamInfo): TeamFlagAsset {
+  const flagCode = FLAG_ASSET_BY_TEAM_CODE[team.code];
+  return {
+    src: `https://flagcdn.com/${flagCode}.svg`,
+    alt: `Bandeira de ${team.name}`,
+    label: team.code,
+  };
+}
+
+export function getTeamFlagAssetByName(name: string): TeamFlagAsset | null {
+  const team = getTeamInfoByName(name);
+  return team ? getTeamFlagAsset(team) : null;
 }
 
 export function getAllTeamNames(): string[] {

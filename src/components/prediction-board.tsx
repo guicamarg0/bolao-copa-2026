@@ -80,25 +80,25 @@ function GoalControl({
 }: GoalControlProps) {
   return (
     <div className={align === "right" ? "md:text-right" : undefined}>
-      <p className="mb-1 text-xs uppercase tracking-wide text-slate-300">Gols</p>
-      <div className="inline-flex h-10 w-full items-center overflow-hidden rounded-xl border border-blue-300/35 bg-[rgba(8,26,53,0.9)] sm:w-[210px]">
+      <p className="mb-1 text-xs uppercase tracking-wide text-[var(--wb-muted)]">Gols</p>
+      <div className="inline-flex h-10 w-full items-center overflow-hidden rounded-lg border border-[var(--wb-border)] bg-white sm:w-[210px]">
         <button
           type="button"
           disabled={locked}
           onClick={onDecrease}
-          className="flex h-full w-12 items-center justify-center border-r border-white/10 text-2xl text-blue-300 transition hover:bg-white/5 disabled:opacity-40"
+          className="flex h-full w-12 items-center justify-center border-r border-[var(--wb-border)] text-2xl text-[var(--wb-primary)] transition hover:bg-blue-50 disabled:opacity-40"
           aria-label={`Diminuir gols de ${label}`}
         >
           <FiMinus />
         </button>
-        <span className="flex-1 text-center font-display text-3xl leading-none text-white">
+        <span className="flex-1 text-center font-display text-3xl leading-none text-[var(--wb-text)]">
           {value}
         </span>
         <button
           type="button"
           disabled={locked}
           onClick={onIncrease}
-          className="flex h-full w-12 items-center justify-center border-l border-white/10 text-2xl text-blue-300 transition hover:bg-white/5 disabled:opacity-40"
+          className="flex h-full w-12 items-center justify-center border-l border-[var(--wb-border)] text-2xl text-[var(--wb-primary)] transition hover:bg-blue-50 disabled:opacity-40"
           aria-label={`Aumentar gols de ${label}`}
         >
           <FiPlus />
@@ -369,7 +369,7 @@ export function PredictionBoard({
             </Surface>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className="rounded-xl border border-[var(--wb-border)] bg-white p-4 shadow-[0_10px_24px_rgba(7,29,73,0.06)]">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
               <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
                 Exibir partidas
@@ -476,12 +476,12 @@ export function PredictionBoard({
                                 ? "Palpites fechados"
                                 : "Palpites em aberto"}
                           </Badge>
-                          <span className="rounded-xl border border-white/12 bg-black/20 px-3 py-1 text-sm text-slate-200">
+                          <span className="rounded-lg border border-[var(--wb-border)] bg-white px-3 py-1 text-sm text-[var(--wb-muted)]">
                             {locked ? "Fechado" : "Aberto"}
                           </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-200">
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[var(--wb-muted)]">
                           <span className="inline-flex items-center gap-1.5">
                             <FiCalendar className="text-base text-blue-200" />
                             {formatKickoffDate(match.kickoffAt)}
@@ -494,7 +494,7 @@ export function PredictionBoard({
 
                         <div className="h-px bg-white/12" />
 
-                        <div className="grid items-center gap-3 grid-cols-[1fr_auto_1fr]">
+                        <div className="grid items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
                           <div className="space-y-2">
                             <TeamPill teamName={match.homeTeam} variant="feature" />
                             <GoalControl
@@ -507,11 +507,11 @@ export function PredictionBoard({
                           </div>
 
                           <div className="flex flex-col items-center justify-center">
-                            <span className="h-10 w-px bg-white/15 md:h-14" />
-                            <span className="my-1 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-blue-300/35 bg-[rgba(8,26,53,0.95)] font-display text-4xl leading-none text-white md:h-14 md:w-14">
+                            <span className="hidden h-10 w-px bg-[var(--wb-border)] md:block md:h-14" />
+                            <span className="my-1 inline-flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--wb-primary)] bg-[var(--wb-primary)] font-display text-4xl leading-none text-white md:h-14 md:w-14">
                               VS
                             </span>
-                            <span className="h-10 w-px bg-white/15 md:h-14" />
+                            <span className="hidden h-10 w-px bg-[var(--wb-border)] md:block md:h-14" />
                           </div>
 
                           <div className="space-y-2">
@@ -533,7 +533,7 @@ export function PredictionBoard({
                         </div>
 
                         <div className="flex flex-col gap-2 border-t border-white/12 pt-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="text-sm text-slate-300">
+                          <div className="text-sm text-[var(--wb-muted)]">
                             <span>{STAGE_LABEL[match.stage]}</span>
                             {match.groupName ? (
                               <span className="inline-flex items-center gap-1 pl-2">
@@ -554,7 +554,7 @@ export function PredictionBoard({
                             size="sm"
                             disabled={locked || savingMatchId === match.id}
                             onClick={() => void savePrediction(match)}
-                            className="h-10 w-full px-4 text-[1.9rem] sm:w-auto sm:text-base"
+                            className="h-10 w-full px-4 text-base sm:w-auto"
                           >
                             <FiSave className="text-xl sm:text-base" />
                             {savingMatchId === match.id ? "Salvando..." : "Salvar palpite"}

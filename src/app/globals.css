@@ -1,17 +1,22 @@
 @import "tailwindcss";
 
 :root {
-  --wb-bg: #0b1e3a;
-  --wb-electric: #1d4ed8;
-  --wb-green: #16a34a;
-  --wb-gold: #d4a017;
-  --wb-red: #dc2626;
+  --wb-bg: #f8fafc;
+  --wb-primary: #123b7a;
+  --wb-primary-dark: #071d49;
+  --wb-electric: #123b7a;
+  --wb-green: #3cac3b;
+  --wb-gold: #f5b700;
+  --wb-red: #e61d25;
   --wb-ice: #f8fafc;
-  --wb-dark: #1e293b;
-  --wb-light: #cbd5e1;
-  --wb-surface: rgba(14, 31, 62, 0.72);
-  --wb-surface-alt: rgba(30, 46, 82, 0.68);
-  --wb-border: rgba(186, 213, 255, 0.22);
+  --wb-dark: #071d49;
+  --wb-light: #64748b;
+  --wb-text: #1f2937;
+  --wb-muted: #64748b;
+  --wb-card: #ffffff;
+  --wb-surface: #ffffff;
+  --wb-surface-alt: #f8fafc;
+  --wb-border: #d1d4d1;
 }
 
 * {
@@ -26,7 +31,7 @@ body {
 
 body {
   background: var(--wb-bg);
-  color: var(--wb-ice);
+  color: var(--wb-text);
   font-family: var(--font-body), sans-serif;
 }
 
@@ -43,8 +48,38 @@ body {
 }
 
 ::selection {
-  background: rgba(29, 78, 216, 0.38);
+  background: rgba(230, 29, 37, 0.28);
   color: white;
+}
+
+.wb-surface :where(.text-white, .text-slate-100, .text-slate-200),
+.wb-surface [class*="text-white"] {
+  color: var(--wb-text) !important;
+}
+
+.wb-surface :where(.text-slate-300, .text-slate-400) {
+  color: var(--wb-muted) !important;
+}
+
+.wb-surface :where(button, a)[class*="text-white"] {
+  color: white !important;
+}
+
+.wb-app-content :where(h1, h2, h3, h4, p, span, td, th, div)[class*="text-white"] {
+  color: var(--wb-text) !important;
+}
+
+.wb-app-content :where(button, a)[class*="text-white"] {
+  color: white !important;
+}
+
+.wb-dark-panel :where(.text-white, .text-slate-100, .text-slate-200),
+.wb-dark-panel [class*="text-white"] {
+  color: var(--wb-ice) !important;
+}
+
+.wb-dark-panel :where(.text-slate-300, .text-slate-400) {
+  color: #cbd5e1 !important;
 }
 
 /* Remove setas/spinners dos campos numericos (Chrome, Edge, Safari, Firefox). */

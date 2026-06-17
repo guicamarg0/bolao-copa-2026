@@ -3,6 +3,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import {
   getAppLeaderboard,
   getAppMatches,
+  getAppPredictions,
   getAppPredictionsForUser,
   getAppProfiles,
   getAppSessionCookieName,
@@ -220,6 +221,27 @@ export async function getPredictionsForUser(userId: string): Promise<Prediction[
     .from("predictions")
     .select("*")
     .eq("user_id", userId);
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data.map((row) => mapPredictionRow(row));
+}
+
+export async function getPredictions(): Promise<Prediction[]> {
+  noStore();
+
+  if (!isSupabaseConfigured()) {
+    return getAppPredictions();
+  }
+
+  const client = await getSupabaseServerClient();
+  if (!client) {
+    return [];
+  }
+
+  const { data, error } = await client.from("predictions").select("*");
 
   if (error || !data) {
     return [];

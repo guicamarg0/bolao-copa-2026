@@ -24,7 +24,7 @@ export const LOCAL_SESSION_COOKIE_NAME = "bolao_local_session";
 
 const LOCAL_DB_PATH = path.join(process.cwd(), "supabase", "local.sqlite");
 const SESSION_TTL_DAYS = 30;
-const LOCAL_SCHEMA_VERSION = 4;
+const LOCAL_SCHEMA_VERSION = 5;
 
 declare global {
   var __bolaoLocalDb: DatabaseSync | undefined;
@@ -58,6 +58,13 @@ interface LocalMatchRow {
   away_team: string;
   kickoff_at: string;
   predictions_closed_at: string | null;
+  prediction_warning_sent_at?: string | null;
+  external_provider?: string | null;
+  external_match_id?: string | null;
+  external_mapping_checked_at?: string | null;
+  live_status?: string | null;
+  result_synced_at?: string | null;
+  result_notified_at?: string | null;
   is_closed: number;
   home_score: number | null;
   away_score: number | null;
@@ -209,6 +216,13 @@ function initializeSchema(db: DatabaseSync) {
       away_team TEXT NOT NULL,
       kickoff_at TEXT NOT NULL,
       predictions_closed_at TEXT,
+      prediction_warning_sent_at TEXT,
+      external_provider TEXT,
+      external_match_id TEXT,
+      external_mapping_checked_at TEXT,
+      live_status TEXT,
+      result_synced_at TEXT,
+      result_notified_at TEXT,
       is_closed INTEGER NOT NULL DEFAULT 0,
       home_score INTEGER,
       away_score INTEGER,
@@ -305,8 +319,26 @@ function initializeSchema(db: DatabaseSync) {
   if (!hasPredictionsClosedAt) {
     db.exec("ALTER TABLE local_matches ADD COLUMN predictions_closed_at TEXT");
   }
+  const optionalMatchColumns = [
+    ["prediction_warning_sent_at", "TEXT"],
+    ["external_provider", "TEXT"],
+    ["external_match_id", "TEXT"],
+    ["external_mapping_checked_at", "TEXT"],
+    ["live_status", "TEXT"],
+    ["result_synced_at", "TEXT"],
+    ["result_notified_at", "TEXT"],
+  ];
+  for (const [columnName, columnType] of optionalMatchColumns) {
+    const hasColumn = matchColumns.some((column) => column.name === columnName);
+    if (!hasColumn) {
+      db.exec(`ALTER TABLE local_matches ADD COLUMN ${columnName} ${columnType}`);
+    }
+  }
   db.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_local_matches_match_number ON local_matches(match_number)",
+  );
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_local_matches_external_match ON local_matches(external_provider, external_match_id) WHERE external_provider IS NOT NULL AND external_match_id IS NOT NULL",
   );
 
 }

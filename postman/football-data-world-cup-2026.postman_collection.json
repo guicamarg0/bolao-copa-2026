@@ -1,0 +1,685 @@
+    {
+      "info": {
+        "_postman_id": "e6428f87-9d2a-4827-b334-38d8d4c54af4",
+        "name": "WorldBet 26 - football-data.org Copa 2026",
+        "description": "Collection para testar os endpoints v4 da football-data.org usados no WorldBet 26. Preencha footballDataToken antes de executar.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+      },
+      "auth": {
+        "type": "noauth"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Resposta HTTP esperada', function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+              "});",
+              "",
+              "const requestsAvailable = pm.response.headers.get('X-RequestsAvailable');",
+              "const resetIn = pm.response.headers.get('X-RequestCounter-Reset');",
+              "if (requestsAvailable) {",
+              "  console.log('Requests disponiveis:', requestsAvailable, 'reset em:', resetIn || 'n/a');",
+              "}",
+              "",
+              "if (pm.response.code !== 204 && pm.response.text()) {",
+              "  pm.test('Resposta JSON', function () {",
+              "    pm.expect(function () { pm.response.json(); }).not.to.throw();",
+              "  });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "variable": [
+        {
+          "key": "footballDataBaseUrl",
+          "value": "https://api.football-data.org/v4",
+          "type": "string"
+        },
+        {
+          "key": "footballDataToken",
+          "value": "",
+          "type": "string"
+        },
+        {
+          "key": "competitionCode",
+          "value": "WC",
+          "type": "string"
+        },
+        {
+          "key": "competitionId",
+          "value": "2000",
+          "type": "string"
+        },
+        {
+          "key": "season",
+          "value": "2026",
+          "type": "string"
+        },
+        {
+          "key": "matchDate",
+          "value": "2026-06-11",
+          "type": "string"
+        },
+        {
+          "key": "dateFrom",
+          "value": "2026-06-11",
+          "type": "string"
+        },
+        {
+          "key": "dateTo",
+          "value": "2026-06-29",
+          "type": "string"
+        },
+        {
+          "key": "matchId",
+          "value": "",
+          "type": "string"
+        },
+        {
+          "key": "matchIds",
+          "value": "",
+          "type": "string"
+        },
+        {
+          "key": "teamId",
+          "value": "",
+          "type": "string"
+        },
+        {
+          "key": "group",
+          "value": "GROUP_A",
+          "type": "string"
+        },
+        {
+          "key": "matchday",
+          "value": "1",
+          "type": "string"
+        }
+      ],
+      "item": [
+        {
+          "name": "00 - Token e limite",
+          "item": [
+            {
+              "name": "Listar competicoes acessiveis",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/competitions",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "competitions"
+                  ]
+                },
+                "description": "Valida token e mostra as competicoes disponiveis para sua conta."
+              }
+            },
+            {
+              "name": "Area World",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/areas/2267",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "areas",
+                    "2267"
+                  ]
+                },
+                "description": "Consulta simples para validar o acesso e ver area World."
+              }
+            }
+          ]
+        },
+        {
+          "name": "01 - Copa 2026",
+          "item": [
+            {
+              "name": "Competicao FIFA World Cup",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/competitions/{{competitionCode}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "competitions",
+                    "{{competitionCode}}"
+                  ]
+                },
+                "description": "World Cup na football-data.org usa codigo WC e id 2000."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const json = pm.response.json();",
+                      "pm.test('Competicao WC', function () {",
+                      "  pm.expect(json.code).to.eql('WC');",
+                      "});",
+                      "if (json.id) {",
+                      "  pm.collectionVariables.set('competitionId', String(json.id));",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Todos os jogos da Copa 2026",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/competitions/{{competitionCode}}/matches?season={{season}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "competitions",
+                    "{{competitionCode}}",
+                    "matches"
+                  ],
+                  "query": [
+                    {
+                      "key": "season",
+                      "value": "{{season}}"
+                    }
+                  ]
+                },
+                "description": "Endpoint principal para mapear matches.id da API com matches.match_number do banco."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const json = pm.response.json();",
+                      "const matches = json.matches || [];",
+                      "pm.test('Retornou jogos', function () {",
+                      "  pm.expect(matches.length).to.be.greaterThan(0);",
+                      "});",
+                      "const first = matches[0];",
+                      "if (first && first.id) {",
+                      "  pm.collectionVariables.set('matchId', String(first.id));",
+                      "  if (first.utcDate) {",
+                      "    pm.collectionVariables.set('matchDate', first.utcDate.slice(0, 10));",
+                      "  }",
+                      "}",
+                      "const ids = matches.slice(0, 20).map(function (match) { return match.id; }).filter(Boolean).join(',');",
+                      "if (ids) {",
+                      "  pm.collectionVariables.set('matchIds', ids);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Times da Copa 2026",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/competitions/{{competitionCode}}/teams?season={{season}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "competitions",
+                    "{{competitionCode}}",
+                    "teams"
+                  ],
+                  "query": [
+                    {
+                      "key": "season",
+                      "value": "{{season}}"
+                    }
+                  ]
+                },
+                "description": "Lista selecoes, IDs, TLA e crest retornados pela football-data.org."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const json = pm.response.json();",
+                      "const teams = json.teams || [];",
+                      "pm.test('Retornou times', function () {",
+                      "  pm.expect(teams.length).to.be.greaterThan(0);",
+                      "});",
+                      "if (teams[0] && teams[0].id) {",
+                      "  pm.collectionVariables.set('teamId', String(teams[0].id));",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Classificacao da Copa 2026",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/competitions/{{competitionCode}}/standings?season={{season}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "competitions",
+                    "{{competitionCode}}",
+                    "standings"
+                  ],
+                  "query": [
+                    {
+                      "key": "season",
+                      "value": "{{season}}"
+                    }
+                  ]
+                },
+                "description": "Tabela da competicao, se a sua conta tiver acesso e a cobertura estiver disponivel."
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Jogos e placar",
+          "item": [
+            {
+              "name": "Jogos por data",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/matches?competitions={{competitionCode}}&date={{matchDate}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "matches"
+                  ],
+                  "query": [
+                    {
+                      "key": "competitions",
+                      "value": "{{competitionCode}}"
+                    },
+                    {
+                      "key": "date",
+                      "value": "{{matchDate}}"
+                    }
+                  ]
+                },
+                "description": "Consulta economica para um dia especifico da Copa."
+              }
+            },
+            {
+              "name": "Jogos por intervalo",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/matches?competitions={{competitionCode}}&dateFrom={{dateFrom}}&dateTo={{dateTo}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "matches"
+                  ],
+                  "query": [
+                    {
+                      "key": "competitions",
+                      "value": "{{competitionCode}}"
+                    },
+                    {
+                      "key": "dateFrom",
+                      "value": "{{dateFrom}}"
+                    },
+                    {
+                      "key": "dateTo",
+                      "value": "{{dateTo}}"
+                    }
+                  ]
+                },
+                "description": "Busca a Copa por intervalo. dateTo esta como 2026-06-29 para incluir jogos de 2026-06-28."
+              }
+            },
+            {
+              "name": "Jogo por matchId com gols",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "X-Unfold-Goals",
+                    "value": "true",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/matches/{{matchId}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "matches",
+                    "{{matchId}}"
+                  ]
+                },
+                "description": "Consulta detalhada do jogo. Use X-Unfold-Goals para receber lista de gols no proprio match."
+              }
+            },
+            {
+              "name": "Varios jogos por matchIds",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "X-Unfold-Goals",
+                    "value": "true",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/matches?ids={{matchIds}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "matches"
+                  ],
+                  "query": [
+                    {
+                      "key": "ids",
+                      "value": "{{matchIds}}"
+                    }
+                  ]
+                },
+                "description": "Consulta varios jogos por IDs separados por virgula. Bom para cron economico durante os jogos."
+              }
+            },
+            {
+              "name": "Jogos ao vivo",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "X-Unfold-Goals",
+                    "value": "true",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/matches?competitions={{competitionCode}}&status=LIVE",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "matches"
+                  ],
+                  "query": [
+                    {
+                      "key": "competitions",
+                      "value": "{{competitionCode}}"
+                    },
+                    {
+                      "key": "status",
+                      "value": "LIVE"
+                    }
+                  ]
+                },
+                "description": "LIVE e um pseudo-status que combina IN_PLAY e PAUSED."
+              }
+            },
+            {
+              "name": "Jogos finalizados",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/competitions/{{competitionCode}}/matches?season={{season}}&status=FINISHED",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "competitions",
+                    "{{competitionCode}}",
+                    "matches"
+                  ],
+                  "query": [
+                    {
+                      "key": "season",
+                      "value": "{{season}}"
+                    },
+                    {
+                      "key": "status",
+                      "value": "FINISHED"
+                    }
+                  ]
+                },
+                "description": "Busca resultados finalizados para fechamento automatico e pontuacao."
+              }
+            },
+            {
+              "name": "Jogos por grupo",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/competitions/{{competitionCode}}/matches?season={{season}}&group={{group}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "competitions",
+                    "{{competitionCode}}",
+                    "matches"
+                  ],
+                  "query": [
+                    {
+                      "key": "season",
+                      "value": "{{season}}"
+                    },
+                    {
+                      "key": "group",
+                      "value": "{{group}}"
+                    }
+                  ]
+                },
+                "description": "Exemplo: GROUP_A, GROUP_B, ... GROUP_L."
+              }
+            },
+            {
+              "name": "Jogos por rodada",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/competitions/{{competitionCode}}/matches?season={{season}}&matchday={{matchday}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "competitions",
+                    "{{competitionCode}}",
+                    "matches"
+                  ],
+                  "query": [
+                    {
+                      "key": "season",
+                      "value": "{{season}}"
+                    },
+                    {
+                      "key": "matchday",
+                      "value": "{{matchday}}"
+                    }
+                  ]
+                },
+                "description": "Consulta por matchday, se a API preencher esse campo para a Copa."
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Times",
+          "item": [
+            {
+              "name": "Time por teamId",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/teams/{{teamId}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "teams",
+                    "{{teamId}}"
+                  ]
+                },
+                "description": "Detalhes de uma selecao/time por ID."
+              }
+            },
+            {
+              "name": "Jogos de um time na Copa",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/teams/{{teamId}}/matches?competitions={{competitionCode}}&season={{season}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "teams",
+                    "{{teamId}}",
+                    "matches"
+                  ],
+                  "query": [
+                    {
+                      "key": "competitions",
+                      "value": "{{competitionCode}}"
+                    },
+                    {
+                      "key": "season",
+                      "value": "{{season}}"
+                    }
+                  ]
+                },
+                "description": "Jogos de um time filtrados pela Copa 2026."
+              }
+            }
+          ]
+        }
+      ]
+    }

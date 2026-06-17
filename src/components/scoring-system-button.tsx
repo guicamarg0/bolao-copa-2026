@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { FiInfo, FiX } from "react-icons/fi";
+import { TeamPill } from "@/components/team-pill";
 import { Button } from "@/components/ui/button";
-import { getTeamInfoByName } from "@/lib/teams";
 
 const examples = [
   {
@@ -53,11 +53,6 @@ const examples = [
   },
 ];
 
-function teamLabel(teamName: string): string {
-  const team = getTeamInfoByName(teamName);
-  return team ? `${team.flag} ${teamName}` : teamName;
-}
-
 export function ScoringSystemButton() {
   const [open, setOpen] = useState(false);
 
@@ -75,23 +70,23 @@ export function ScoringSystemButton() {
           aria-modal="true"
           aria-labelledby="scoring-system-title"
         >
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-surface)] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.45)] md:p-5">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-[var(--wb-border)] bg-white p-4 shadow-[0_24px_80px_rgba(7,29,73,0.24)] md:p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2
                   id="scoring-system-title"
-                  className="font-display text-2xl uppercase tracking-[0.08em] text-white md:text-3xl"
+                  className="font-display text-2xl uppercase tracking-[0.08em] text-[var(--wb-text)] md:text-3xl"
                 >
                   Sistema de pontuacao
                 </h2>
-                <p className="mt-1 text-sm text-slate-300">
+                <p className="mt-1 text-sm text-[var(--wb-muted)]">
                   Cada palpite pontua pelo melhor criterio atingido.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-100 transition hover:bg-white/10"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--wb-border)] bg-white text-[var(--wb-primary)] transition hover:bg-blue-50"
                 aria-label="Fechar sistema de pontuacao"
               >
                 <FiX />
@@ -102,31 +97,31 @@ export function ScoringSystemButton() {
               {examples.map((example) => (
                 <div
                   key={example.title}
-                  className="rounded-xl border border-white/10 bg-white/5 p-3"
+                  className="rounded-xl border border-[var(--wb-border)] bg-[var(--wb-surface-alt)] p-3"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold uppercase tracking-wide text-blue-100">
+                    <p className="text-sm font-semibold uppercase tracking-wide text-[var(--wb-primary)]">
                       {example.title}
                     </p>
-                    <span className="rounded-lg border border-emerald-300/30 bg-emerald-500/15 px-2 py-1 text-xs font-semibold text-emerald-100">
+                    <span className="rounded-lg border border-green-200 bg-green-50 px-2 py-1 text-xs font-semibold text-[var(--wb-green)]">
                       {example.points}
                     </span>
                   </div>
-                  <div className="mt-3 grid gap-2 text-sm text-slate-200 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                    <p>{teamLabel(example.homeTeam)}</p>
-                    <p className="font-display text-2xl text-white">
+                  <div className="mt-3 grid gap-2 text-sm text-[var(--wb-text)] md:grid-cols-[1fr_auto_1fr] md:items-center">
+                    <TeamPill teamName={example.homeTeam} />
+                    <p className="font-display text-2xl text-[var(--wb-primary)]">
                       {example.finalScore}
                     </p>
-                    <p className="md:text-right">{teamLabel(example.awayTeam)}</p>
+                    <TeamPill teamName={example.awayTeam} align="right" />
                   </div>
-                  <p className="mt-2 text-sm text-slate-300">
+                  <p className="mt-2 text-sm text-[var(--wb-muted)]">
                     Palpite: {example.prediction} | {example.description}
                   </p>
                 </div>
               ))}
             </div>
 
-            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-300">
+            <div className="mt-4 rounded-xl border border-[var(--wb-border)] bg-blue-50 p-3 text-sm text-[var(--wb-muted)]">
               <p>Empate correto sem placar exato vale 5 pts.</p>
               <p>Vencedor + diferenca vale 7 pts apenas quando existe vencedor.</p>
               <p>Sem palpite no jogo: 0 pts.</p>

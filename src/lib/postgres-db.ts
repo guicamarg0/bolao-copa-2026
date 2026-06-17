@@ -15,7 +15,7 @@ import type {
 export const POSTGRES_SESSION_COOKIE_NAME = "bolao_local_session";
 
 const SESSION_TTL_DAYS = 30;
-const POSTGRES_SCHEMA_VERSION = 4;
+const POSTGRES_SCHEMA_VERSION = 5;
 
 declare global {
   var __bolaoPgPool: Pool | undefined;
@@ -50,6 +50,13 @@ interface PostgresMatchRow {
   away_team: string;
   kickoff_at: string | Date;
   predictions_closed_at: string | Date | null;
+  prediction_warning_sent_at?: string | Date | null;
+  external_provider?: string | null;
+  external_match_id?: string | null;
+  external_mapping_checked_at?: string | Date | null;
+  live_status?: string | null;
+  result_synced_at?: string | Date | null;
+  result_notified_at?: string | Date | null;
   is_closed: boolean;
   home_score: number | null;
   away_score: number | null;
@@ -296,9 +303,25 @@ async function ensureSchema() {
   await pool.query(
     "ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS predictions_closed_at timestamptz",
   );
+  await pool.query(
+    "ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS prediction_warning_sent_at timestamptz",
+  );
+  await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS external_provider text");
+  await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS external_match_id text");
+  await pool.query(
+    "ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS external_mapping_checked_at timestamptz",
+  );
+  await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS live_status text");
+  await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS result_synced_at timestamptz");
+  await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS result_notified_at timestamptz");
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_matches_match_number
     ON public.matches (match_number)
+  `);
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_matches_external_match
+    ON public.matches (external_provider, external_match_id)
+    WHERE external_provider IS NOT NULL AND external_match_id IS NOT NULL
   `);
 
   globalThis.__bolaoPgSchemaVersion = POSTGRES_SCHEMA_VERSION;
@@ -553,7 +576,7 @@ export async function getPostgresPredictionsForUser(
   return result.rows.map(mapPredictionRow);
 }
 
-async function getPostgresAllPredictions(): Promise<Prediction[]> {
+export async function getPostgresAllPredictions(): Promise<Prediction[]> {
   await ensureSchema();
   const pool = getPool();
   const result = await pool.query<PostgresPredictionRow>("SELECT * FROM public.predictions");

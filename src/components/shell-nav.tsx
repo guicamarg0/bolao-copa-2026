@@ -71,7 +71,7 @@ function NavContent({
         <p className="font-display text-3xl uppercase tracking-[0.12em] text-[var(--wb-ice)]">
           WorldBet 26
         </p>
-        <p className="mt-1 text-xs text-slate-300">Plataforma premium de bolao Copa 2026</p>
+        <p className="mt-1 text-xs text-blue-100">Bolao Copa 2026</p>
       </div>
 
       <nav className="space-y-1 px-3 py-4">
@@ -87,14 +87,14 @@ function NavContent({
               className={cn(
                 "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200",
                 active
-                  ? "border border-blue-300/45 bg-[linear-gradient(135deg,rgba(29,78,216,0.42),rgba(11,30,58,0.8))] text-white shadow-[0_12px_26px_rgba(29,78,216,0.25)]"
-                  : "border border-transparent text-slate-300 hover:border-white/12 hover:bg-white/5 hover:text-white",
+                  ? "border border-white/35 bg-white text-[var(--wb-primary)] shadow-[0_10px_24px_rgba(7,29,73,0.22)]"
+                  : "border border-transparent text-blue-100 hover:border-white/20 hover:bg-white/10 hover:text-white",
               )}
             >
               <Icon
                 className={cn(
                   "text-base transition-transform duration-200 group-hover:scale-110",
-                  active ? "text-[var(--wb-ice)]" : "text-slate-400",
+                  active ? "text-[var(--wb-red)]" : "text-blue-100",
                 )}
               />
               <span>{item.label}</span>
@@ -104,11 +104,11 @@ function NavContent({
       </nav>
 
       <div className="mt-auto border-t border-white/10 px-5 py-4">
-        <p className="text-xs text-slate-400">Sessao ativa</p>
-        <p className="mt-1 text-sm font-semibold text-slate-200">
+        <p className="text-xs text-blue-100">Sessao ativa</p>
+        <p className="mt-1 text-sm font-semibold text-white">
           {viewerName?.trim() ? viewerName : "Convidado"}
         </p>
-        <p className="mt-2 inline-flex rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-slate-300">
+        <p className="mt-2 inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[11px] text-blue-100">
           {modeLabel}
         </p>
 
@@ -119,7 +119,7 @@ function NavContent({
             <Link
               href="/login"
               onClick={onNavigate}
-              className="inline-flex w-full items-center justify-center rounded-xl border border-blue-300/35 bg-blue-500/20 px-3 py-2.5 text-sm font-semibold text-blue-100 transition-colors hover:bg-blue-500/30"
+              className="inline-flex w-full items-center justify-center rounded-lg border border-white/25 bg-white px-3 py-2.5 text-sm font-semibold text-[var(--wb-primary)] transition-colors hover:bg-blue-50"
             >
               Entrar
             </Link>
@@ -136,7 +136,7 @@ export function ShellNav({ items, viewerId, viewerName, modeLabel }: ShellNavPro
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-white/10 bg-[linear-gradient(180deg,#0B1E3A,#102347,#0F1F3A)] lg:block">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-[var(--wb-primary-dark)] bg-[linear-gradient(180deg,var(--wb-primary),var(--wb-primary-dark))] lg:block">
         <NavContent
           items={items}
           pathname={pathname}
@@ -151,7 +151,7 @@ export function ShellNav({ items, viewerId, viewerName, modeLabel }: ShellNavPro
         aria-label="Abrir menu"
         onClick={() => setOpen(true)}
         className={cn(
-          "fixed left-4 top-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-[#0b1e3adf] text-white shadow-[0_10px_24px_rgba(3,9,22,0.4)] lg:hidden",
+          "fixed left-4 top-4 z-50 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-white/20 bg-[var(--wb-primary)] text-white shadow-[0_10px_24px_rgba(7,29,73,0.28)] lg:hidden",
           open ? "pointer-events-none opacity-0" : "opacity-100",
         )}
       >
@@ -172,7 +172,7 @@ export function ShellNav({ items, viewerId, viewerName, modeLabel }: ShellNavPro
             />
 
             <motion.aside
-              className="fixed inset-y-0 left-0 z-50 w-[min(88vw,22rem)] border-r border-white/10 bg-[linear-gradient(180deg,#0B1E3A,#102347,#0F1F3A)] lg:hidden"
+              className="fixed inset-y-0 left-0 z-50 w-[min(88vw,22rem)] border-r border-[var(--wb-primary-dark)] bg-[linear-gradient(180deg,var(--wb-primary),var(--wb-primary-dark))] lg:hidden"
               initial={{ x: -320 }}
               animate={{ x: 0 }}
               exit={{ x: -320 }}

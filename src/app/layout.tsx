@@ -35,7 +35,7 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${fontDisplay.variable} ${fontUi.variable} ${fontBody.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-[var(--wb-bg)] font-body text-[var(--wb-ice)]">
+      <body className="min-h-full bg-[var(--wb-bg)] font-body text-[var(--wb-text)]">
         {children}
       </body>
     </html>

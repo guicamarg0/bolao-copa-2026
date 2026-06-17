@@ -4,6 +4,7 @@ import { Pool, type PoolClient } from "pg";
 import { scorePrediction } from "@/lib/scoring";
 import { getTeamInfoByName } from "@/lib/teams";
 
+const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const TELEGRAM_MESSAGE_LIMIT = 3900;
 const REGIONAL_INDICATOR_OFFSET = 127397;
@@ -82,6 +83,8 @@ interface MatchRow {
   away_team: string;
   kickoff_at: string;
   venue: string | null;
+  prediction_warning_sent_at?: string | null;
+  result_notified_at?: string | null;
   home_score?: number | null;
   away_score?: number | null;
 }
@@ -111,7 +114,7 @@ interface MatchReportRow {
 }
 
 export interface MatchPredictionLockResult {
-  status: "not_due" | "already_sent" | "generated" | "sent" | "error";
+  status: "not_due" | "warning_sent" | "already_sent" | "generated" | "sent" | "error";
   matchId: string;
   matchLabel: string;
   message: string;
@@ -131,7 +134,7 @@ declare global {
   var __bolaoMatchReportPool: Pool | undefined;
 }
 
-function getPool(): Pool | null {
+export function getPool(): Pool | null {
   const connectionString = process.env.DATABASE_URL?.trim();
   if (!connectionString) {
     return null;
@@ -315,32 +318,13 @@ function limitTelegramBody(lines: string[]): string {
   return limited.join("\n");
 }
 
-async function sendTelegramMessage(params: {
-  match: MatchRow;
-  lockDeadlineAt: string;
-  profiles: ProfileRow[];
-  predictions: PredictionRow[];
-}): Promise<string | null> {
+async function sendTelegramText(lines: string[]): Promise<string | null> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
   const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
 
   if (!botToken || !chatId) {
     return null;
   }
-
-  const body = [
-    `WorldBet 26 - Palpites fechados`,
-    `Jogo: ${getMatchLabel(params.match)}`,
-    `Horario: ${formatLocalDateTime(params.match.kickoff_at)}`,
-    `Fechamento: ${formatLocalDateTime(params.lockDeadlineAt)}`,
-    "",
-    "Palpites",
-    "",
-    ...buildPredictionLines({
-      profiles: params.profiles,
-      predictions: params.predictions,
-    }),
-  ];
 
   const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
@@ -349,7 +333,7 @@ async function sendTelegramMessage(params: {
     },
     body: JSON.stringify({
       chat_id: chatId,
-      text: limitTelegramBody(body),
+      text: limitTelegramBody(lines),
       disable_web_page_preview: true,
     }),
   });
@@ -365,6 +349,39 @@ async function sendTelegramMessage(params: {
   return payload?.result?.message_id ? String(payload.result.message_id) : null;
 }
 
+async function sendPredictionWarningTelegramMessage(params: {
+  match: MatchRow;
+  lockDeadlineAt: string;
+}): Promise<string | null> {
+  return sendTelegramText([
+    "WorldBet 26 - Aviso de fechamento",
+    `Jogo: ${getMatchLabel(params.match)}`,
+    `Horario: ${formatLocalDateTime(params.match.kickoff_at)}`,
+    `Os palpites fecham em 30 minutos: ${formatLocalDateTime(params.lockDeadlineAt)}`,
+  ]);
+}
+
+async function sendTelegramMessage(params: {
+  match: MatchRow;
+  lockDeadlineAt: string;
+  profiles: ProfileRow[];
+  predictions: PredictionRow[];
+}): Promise<string | null> {
+  return sendTelegramText([
+    "WorldBet 26 - Palpites fechados",
+    `Jogo: ${getMatchLabel(params.match)}`,
+    `Horario: ${formatLocalDateTime(params.match.kickoff_at)}`,
+    `Fechamento: ${formatLocalDateTime(params.lockDeadlineAt)}`,
+    "",
+    "Palpites",
+    "",
+    ...buildPredictionLines({
+      profiles: params.profiles,
+      predictions: params.predictions,
+    }),
+  ]);
+}
+
 async function sendFinishedMatchTelegramMessage(params: {
   match: MatchRow;
   homeScore: number;
@@ -372,14 +389,7 @@ async function sendFinishedMatchTelegramMessage(params: {
   profiles: ProfileRow[];
   predictions: PredictionRow[];
 }): Promise<string | null> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
-
-  if (!botToken || !chatId) {
-    return null;
-  }
-
-  const body = [
+  return sendTelegramText([
     "WorldBet 26 - Jogo Finalizado",
     `Jogo: ${getMatchLabel(params.match)}`,
     `Horario: ${formatLocalDateTime(params.match.kickoff_at)}`,
@@ -393,29 +403,7 @@ async function sendFinishedMatchTelegramMessage(params: {
       homeScore: params.homeScore,
       awayScore: params.awayScore,
     }),
-  ];
-
-  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: limitTelegramBody(body),
-      disable_web_page_preview: true,
-    }),
-  });
-
-  const payload = (await response.json().catch(() => null)) as
-    | { ok?: boolean; result?: { message_id?: number }; description?: string }
-    | null;
-
-  if (!response.ok || payload?.ok === false) {
-    throw new Error(payload?.description ?? "Falha ao enviar Telegram.");
-  }
-
-  return payload?.result?.message_id ? String(payload.result.message_id) : null;
+  ]);
 }
 
 async function processMatchPredictionLock(
@@ -423,8 +411,53 @@ async function processMatchPredictionLock(
   match: MatchRow,
   now: Date,
 ): Promise<MatchPredictionLockResult> {
-  const lockDeadlineAt = new Date(new Date(match.kickoff_at).getTime() - ONE_HOUR_MS);
+  const kickoffAt = new Date(match.kickoff_at);
+  const warningDeadlineAt = new Date(kickoffAt.getTime() - ONE_HOUR_MS);
+  const lockDeadlineAt = new Date(kickoffAt.getTime() - THIRTY_MINUTES_MS);
   const matchLabel = getMatchLabel(match);
+
+  if (
+    !match.prediction_warning_sent_at &&
+    now.getTime() >= warningDeadlineAt.getTime() &&
+    now.getTime() < lockDeadlineAt.getTime()
+  ) {
+    try {
+      const telegramMessageId = await sendPredictionWarningTelegramMessage({
+        match,
+        lockDeadlineAt: lockDeadlineAt.toISOString(),
+      });
+
+      await client.query(
+        `
+          UPDATE public.matches
+          SET prediction_warning_sent_at = $1
+          WHERE id = $2
+            AND prediction_warning_sent_at IS NULL
+        `,
+        [now.toISOString(), match.id],
+      );
+
+      return {
+        status: "warning_sent",
+        matchId: match.id,
+        matchLabel,
+        message: telegramMessageId
+          ? "Aviso de fechamento enviado no Telegram."
+          : "Aviso de fechamento marcado; Telegram nao configurado.",
+        telegramMessageId,
+      };
+    } catch (error) {
+      return {
+        status: "error",
+        matchId: match.id,
+        matchLabel,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Falha ao enviar aviso de fechamento.",
+      };
+    }
+  }
 
   if (now.getTime() < lockDeadlineAt.getTime()) {
     return {
@@ -625,7 +658,17 @@ export async function processMatchPredictionLocks(
     const dueUntil = new Date(now.getTime() + ONE_HOUR_MS).toISOString();
     const matchesResult = await client.query<MatchRow>(
       `
-        SELECT id, stage, group_name, match_number, round_number, home_team, away_team, kickoff_at, venue
+        SELECT
+          id,
+          stage,
+          group_name,
+          match_number,
+          round_number,
+          home_team,
+          away_team,
+          kickoff_at,
+          venue,
+          prediction_warning_sent_at
         FROM public.matches
         WHERE kickoff_at <= $1
           AND predictions_closed_at IS NULL
@@ -675,7 +718,19 @@ export async function notifyFinishedMatchResult(params: {
     const [matchResult, profilesResult, predictionsResult] = await Promise.all([
       client.query<MatchRow>(
         `
-          SELECT id, stage, group_name, match_number, round_number, home_team, away_team, kickoff_at, venue, home_score, away_score
+          SELECT
+            id,
+            stage,
+            group_name,
+            match_number,
+            round_number,
+            home_team,
+            away_team,
+            kickoff_at,
+            venue,
+            home_score,
+            away_score,
+            result_notified_at
           FROM public.matches
           WHERE id = $1
           LIMIT 1
@@ -705,13 +760,31 @@ export async function notifyFinishedMatchResult(params: {
       return null;
     }
 
-    return sendFinishedMatchTelegramMessage({
+    if (match.result_notified_at) {
+      return null;
+    }
+
+    const telegramMessageId = await sendFinishedMatchTelegramMessage({
       match,
       homeScore: params.homeScore,
       awayScore: params.awayScore,
       profiles: profilesResult.rows,
       predictions: predictionsResult.rows,
     });
+
+    if (telegramMessageId) {
+      await client.query(
+        `
+          UPDATE public.matches
+          SET result_notified_at = $1
+          WHERE id = $2
+            AND result_notified_at IS NULL
+        `,
+        [new Date().toISOString(), params.matchId],
+      );
+    }
+
+    return telegramMessageId;
   } finally {
     client.release();
   }

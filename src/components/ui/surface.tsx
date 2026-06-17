@@ -8,7 +8,7 @@ export function Surface({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-[var(--wb-border)] bg-[var(--wb-surface)]/90 shadow-[0_16px_48px_rgba(3,9,22,0.35)] backdrop-blur-sm",
+        "wb-surface rounded-xl border border-[var(--wb-border)] bg-[var(--wb-card)] shadow-[0_12px_32px_rgba(7,29,73,0.09)]",
         className,
       )}
       {...props}

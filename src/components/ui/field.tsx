@@ -5,11 +5,11 @@ type FieldState = "default" | "error" | "success";
 
 const stateClass: Record<FieldState, string> = {
   default:
-    "border-[var(--wb-border)] bg-[var(--wb-surface-alt)] text-[var(--wb-ice)] placeholder:text-slate-400 focus:border-[var(--wb-electric)]",
+    "border-[var(--wb-border)] bg-white text-[var(--wb-text)] placeholder:text-slate-400 focus:border-[var(--wb-primary)]",
   error:
-    "border-red-400/70 bg-red-500/10 text-red-100 placeholder:text-red-200/80 focus:border-red-300",
+    "border-red-300 bg-red-50 text-[var(--wb-text)] placeholder:text-red-300 focus:border-[var(--wb-red)]",
   success:
-    "border-emerald-400/70 bg-emerald-500/10 text-emerald-100 placeholder:text-emerald-200/90 focus:border-emerald-300",
+    "border-green-300 bg-green-50 text-[var(--wb-text)] placeholder:text-green-400 focus:border-[var(--wb-green)]",
 };
 
 interface BaseFieldProps {
@@ -24,7 +24,7 @@ export function Input({ className, state = "default", ...props }: InputProps) {
   return (
     <input
       className={cn(
-        "h-11 w-full rounded-xl border px-3 text-sm outline-none transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60",
+        "h-11 w-full rounded-lg border px-3 text-sm outline-none transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60",
         stateClass[state],
         className,
       )}
@@ -46,7 +46,7 @@ export function Select({
   return (
     <select
       className={cn(
-        "h-11 w-full rounded-xl border px-3 text-sm outline-none transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60",
+        "h-11 w-full rounded-lg border px-3 text-sm outline-none transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60",
         stateClass[state],
         className,
       )}

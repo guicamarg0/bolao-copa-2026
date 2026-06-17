@@ -62,12 +62,12 @@ export function LeaderboardTable({ rows }: LeaderboardTableProps) {
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--wb-border)] bg-white p-4 shadow-[0_10px_24px_rgba(7,29,73,0.06)]">
         <div>
-          <h2 className="font-display text-2xl uppercase tracking-[0.08em] text-white">
+          <h2 className="font-display text-2xl uppercase tracking-[0.08em] text-[var(--wb-text)]">
             Leaderboard
           </h2>
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-[var(--wb-muted)]">
             Classificação por pontos, acertos e consistência dos palpites.
           </p>
         </div>
@@ -78,8 +78,8 @@ export function LeaderboardTable({ rows }: LeaderboardTableProps) {
             className={cn(
               "rounded-xl px-3 py-2 text-sm font-semibold transition-colors",
               mode === "overall"
-                ? "bg-blue-500/30 text-blue-100"
-                : "bg-white/5 text-slate-300 hover:bg-white/10",
+                ? "bg-[var(--wb-primary)] text-white"
+                : "bg-slate-50 text-[var(--wb-muted)] hover:bg-blue-50",
             )}
           >
             Ranking geral
@@ -90,8 +90,8 @@ export function LeaderboardTable({ rows }: LeaderboardTableProps) {
             className={cn(
               "rounded-xl px-3 py-2 text-sm font-semibold transition-colors",
               mode === "weekly"
-                ? "bg-green-500/30 text-emerald-100"
-                : "bg-white/5 text-slate-300 hover:bg-white/10",
+                ? "bg-[var(--wb-green)] text-white"
+                : "bg-slate-50 text-[var(--wb-muted)] hover:bg-green-50",
             )}
           >
             Ranking semanal

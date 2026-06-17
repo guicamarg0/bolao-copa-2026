@@ -68,6 +68,13 @@ create table if not exists public.matches (
   away_team text not null,
   kickoff_at timestamptz not null,
   predictions_closed_at timestamptz,
+  prediction_warning_sent_at timestamptz,
+  external_provider text,
+  external_match_id text,
+  external_mapping_checked_at timestamptz,
+  live_status text,
+  result_synced_at timestamptz,
+  result_notified_at timestamptz,
   is_closed boolean not null default false,
   home_score integer,
   away_score integer,
@@ -92,8 +99,33 @@ alter table public.matches
 alter table public.matches
   add column if not exists predictions_closed_at timestamptz;
 
+alter table public.matches
+  add column if not exists prediction_warning_sent_at timestamptz;
+
+alter table public.matches
+  add column if not exists external_provider text;
+
+alter table public.matches
+  add column if not exists external_match_id text;
+
+alter table public.matches
+  add column if not exists external_mapping_checked_at timestamptz;
+
+alter table public.matches
+  add column if not exists live_status text;
+
+alter table public.matches
+  add column if not exists result_synced_at timestamptz;
+
+alter table public.matches
+  add column if not exists result_notified_at timestamptz;
+
 create unique index if not exists idx_matches_match_number
   on public.matches (match_number);
+
+create unique index if not exists idx_matches_external_match
+  on public.matches (external_provider, external_match_id)
+  where external_provider is not null and external_match_id is not null;
 
 create table if not exists public.daily_prediction_reports (
   id uuid primary key default gen_random_uuid(),
@@ -207,7 +239,7 @@ as $$
     where m.id = target_match_id
       and m.is_closed = false
       and m.predictions_closed_at is null
-      and now() < (m.kickoff_at - interval '1 hour')
+      and now() < (m.kickoff_at - interval '30 minutes')
   );
 $$;
 

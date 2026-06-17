@@ -22,7 +22,7 @@ export function isMatchFinished(match: Match): boolean {
 }
 
 export function getPredictionDeadline(match: Match): Date {
-  return new Date(new Date(match.kickoffAt).getTime() - 60 * 60 * 1000);
+  return new Date(new Date(match.kickoffAt).getTime() - 30 * 60 * 1000);
 }
 
 export function isPredictionLocked(

@@ -389,6 +389,7 @@ async function saveOfficialResult(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/jogos");
   revalidatePath("/palpites");
+  revalidatePath("/palpites-fechados");
   revalidatePath("/ranking");
   revalidatePath("/admin");
 }
@@ -424,6 +425,7 @@ async function reopenMatch(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/jogos");
   revalidatePath("/palpites");
+  revalidatePath("/palpites-fechados");
   revalidatePath("/ranking");
   revalidatePath("/admin");
 }
@@ -768,7 +770,7 @@ export default async function AdminPage({
                 <Select name="home_team" required defaultValue="Brasil" disabled={!viewer.isAdmin}>
                   {WORLD_CUP_2026_TEAMS.map((team) => (
                     <option key={`home-${team.code}`} value={team.name}>
-                      {team.flag} {team.name}
+                      {team.code} - {team.name}
                     </option>
                   ))}
                 </Select>
@@ -783,7 +785,7 @@ export default async function AdminPage({
                 >
                   {WORLD_CUP_2026_TEAMS.map((team) => (
                     <option key={`away-${team.code}`} value={team.name}>
-                      {team.flag} {team.name}
+                      {team.code} - {team.name}
                     </option>
                   ))}
                 </Select>
@@ -853,7 +855,7 @@ export default async function AdminPage({
                   rows={8}
                   disabled={!viewer.isAdmin}
                   placeholder={'1,group,A,1,Mexico,Africa do Sul,2026-06-11T19:00:00Z,"Estadio Azteca, Cidade do Mexico"'}
-                  className="w-full rounded-xl border border-[var(--wb-border)] bg-[var(--wb-surface-alt)] px-3 py-2 text-sm text-[var(--wb-ice)] outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-[var(--wb-electric)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-lg border border-[var(--wb-border)] bg-white px-3 py-2 text-sm text-[var(--wb-text)] outline-none transition-colors duration-200 placeholder:text-slate-400 focus:border-[var(--wb-primary)] disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </label>
               <Button type="submit" variant="secondary" disabled={!viewer.isAdmin}>

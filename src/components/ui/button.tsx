@@ -12,16 +12,16 @@ type ButtonSize = "sm" | "md" | "lg";
 
 const variantClass: Record<ButtonVariant, string> = {
   primary:
-    "bg-[var(--wb-electric)] text-white shadow-[0_10px_30px_rgba(29,78,216,0.35)] hover:bg-[#1b44c7]",
+    "bg-[var(--wb-red)] text-white shadow-[0_10px_24px_rgba(230,29,37,0.24)] hover:bg-[#c9161d]",
   secondary:
-    "bg-[color:var(--wb-surface-alt)] text-[var(--wb-ice)] border border-[var(--wb-border)] hover:bg-[color:var(--wb-surface)]",
+    "bg-white text-[var(--wb-primary)] border border-[var(--wb-border)] hover:bg-[var(--wb-surface-alt)]",
   success:
-    "bg-[var(--wb-green)] text-white shadow-[0_10px_30px_rgba(22,163,74,0.32)] hover:bg-[#0f9441]",
+    "bg-[var(--wb-green)] text-white shadow-[0_10px_24px_rgba(60,172,59,0.24)] hover:bg-[#2f9630]",
   danger:
-    "bg-[var(--wb-red)] text-white shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:bg-[#bb1f1f]",
+    "bg-[var(--wb-red)] text-white shadow-[0_10px_24px_rgba(230,29,37,0.24)] hover:bg-[#c9161d]",
   ghost:
-    "text-[var(--wb-light)] border border-[var(--wb-border)] bg-transparent hover:bg-white/5",
-  icon: "bg-[color:var(--wb-surface-alt)] text-[var(--wb-ice)] border border-[var(--wb-border)] hover:bg-[color:var(--wb-surface)]",
+    "text-[var(--wb-primary)] border border-[var(--wb-border)] bg-transparent hover:bg-[#eef4ff]",
+  icon: "bg-white text-[var(--wb-primary)] border border-[var(--wb-border)] hover:bg-[var(--wb-surface-alt)]",
 };
 
 const sizeClass: Record<ButtonSize, string> = {
@@ -44,7 +44,7 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50",
         variantClass[variant],
         sizeClass[size],
         className,

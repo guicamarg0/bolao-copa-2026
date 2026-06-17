@@ -88,9 +88,9 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
 
   return (
     <section className="space-y-5">
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div className="rounded-xl border border-[var(--wb-border)] bg-white p-4 shadow-[0_10px_24px_rgba(7,29,73,0.06)]">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_auto] md:items-end">
-          <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
+          <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-[var(--wb-muted)]">
             Fase
             <Select
               value={stage}
@@ -108,7 +108,7 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
             </Select>
           </label>
 
-          <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
+          <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-[var(--wb-muted)]">
             Status
             <Select
               value={status}
@@ -124,7 +124,7 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
             </Select>
           </label>
 
-          <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
+          <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-[var(--wb-muted)]">
             Grupo
             <Select
               value={groupFilter}
@@ -142,7 +142,7 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
             </Select>
           </label>
 
-          <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
+          <label className="space-y-1 text-xs font-semibold uppercase tracking-wide text-[var(--wb-muted)]">
             Rodada
             <Select
               value={roundFilter}
@@ -179,14 +179,14 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
       </div>
 
       <div className="space-y-3">
-        <h2 className="font-display text-2xl uppercase tracking-[0.08em] text-[var(--wb-ice)]">
+        <h2 className="font-display text-2xl uppercase tracking-[0.08em] text-[var(--wb-text)]">
           Todos os jogos
         </h2>
 
         {filteredMatches.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
-            <p className="text-lg font-semibold text-slate-100">Nenhum jogo encontrado</p>
-            <p className="mt-2 text-sm text-slate-300">
+          <div className="rounded-xl border border-[var(--wb-border)] bg-white p-8 text-center">
+            <p className="text-lg font-semibold text-[var(--wb-text)]">Nenhum jogo encontrado</p>
+            <p className="mt-2 text-sm text-[var(--wb-muted)]">
               Ajuste os filtros para visualizar partidas da Copa.
             </p>
           </div>
@@ -206,8 +206,8 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
-              <p className="text-slate-300">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--wb-border)] bg-white px-3 py-2 text-sm">
+              <p className="text-[var(--wb-muted)]">
                 Pagina {currentPage} de {totalPages} | {filteredMatches.length} jogos
               </p>
               <div className="flex w-full gap-2 sm:w-auto">
@@ -223,7 +223,7 @@ export function MatchesBoard({ matches }: MatchesBoardProps) {
                 <motion.div
                   initial={{ opacity: 0.6 }}
                   animate={{ opacity: 1 }}
-                  className="inline-flex min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-slate-100"
+                  className="inline-flex min-w-[44px] items-center justify-center rounded-lg border border-[var(--wb-border)] bg-white px-3 py-1.5 text-[var(--wb-text)]"
                 >
                   {currentPage}
                 </motion.div>

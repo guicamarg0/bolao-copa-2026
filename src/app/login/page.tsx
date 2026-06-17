@@ -5,7 +5,7 @@ export default async function LoginPage() {
   await redirectIfAuthenticated();
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[var(--wb-bg)] px-4 py-10">
+    <main className="relative min-h-screen overflow-hidden bg-[linear-gradient(145deg,var(--wb-primary),var(--wb-primary-dark))] px-4 py-10">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_15%,rgba(29,78,216,0.3),transparent_35%),radial-gradient(circle_at_90%_15%,rgba(22,163,74,0.24),transparent_34%),radial-gradient(circle_at_50%_100%,rgba(212,160,23,0.2),transparent_38%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(160deg,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:34px_34px]" />
 
