@@ -330,6 +330,15 @@ export function getTeamInfoByName(name: string | null | undefined): TeamInfo | n
   return TEAM_BY_NORMALIZED_NAME.get(key) ?? null;
 }
 
+export function getTeamInfoByCode(code: string | null | undefined): TeamInfo | null {
+  const normalizedCode = code?.trim().toUpperCase();
+  if (!normalizedCode) {
+    return null;
+  }
+
+  return TEAM_BY_CODE.get(normalizedCode as TeamCode) ?? null;
+}
+
 export function getTeamFlagAsset(team: TeamInfo): TeamFlagAsset {
   const flagCode = FLAG_ASSET_BY_TEAM_CODE[team.code];
   return {

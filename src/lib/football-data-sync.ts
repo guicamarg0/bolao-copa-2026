@@ -2,7 +2,8 @@ import "server-only";
 
 import type { PoolClient } from "pg";
 import { getPool, notifyFinishedMatchResult } from "@/lib/match-prediction-report";
-import { getTeamInfoByName } from "@/lib/teams";
+import { getTeamInfoByCode, getTeamInfoByName } from "@/lib/teams";
+import type { MatchStage } from "@/lib/types";
 
 const PROVIDER = "football-data.org";
 const DEFAULT_BASE_URL = "https://api.football-data.org/v4";
@@ -11,12 +12,35 @@ const DEFAULT_SEASON = "2026";
 const MATCH_MAPPING_TOLERANCE_MS = 36 * 60 * 60 * 1000;
 const MAX_MATCHES_PER_SYNC = 20;
 
+const KNOCKOUT_STAGE_CONFIG: Record<
+  string,
+  { localStage: MatchStage; firstMatchNumber: number }
+> = {
+  LAST_32: { localStage: "round_of_32", firstMatchNumber: 73 },
+  LAST_16: { localStage: "round_of_16", firstMatchNumber: 89 },
+  QUARTER_FINALS: { localStage: "quarterfinal", firstMatchNumber: 97 },
+  SEMI_FINALS: { localStage: "semifinal", firstMatchNumber: 101 },
+  THIRD_PLACE: { localStage: "third_place", firstMatchNumber: 103 },
+  FINAL: { localStage: "final", firstMatchNumber: 104 },
+};
+
+const STAGE_ALIASES: Record<string, string> = {
+  ROUND_OF_32: "LAST_32",
+  ROUND_OF_16: "LAST_16",
+};
+
 interface LocalMatchRow {
   id: string;
   match_number: number | null;
   home_team: string | null;
   away_team: string | null;
   kickoff_at: string;
+  external_match_id: string | null;
+}
+
+interface ExistingMatchIdentity {
+  id: string;
+  match_number: number | null;
   external_match_id: string | null;
 }
 
@@ -35,6 +59,7 @@ interface FootballDataMatch {
   matchday?: number | null;
   stage?: string | null;
   group?: string | null;
+  venue?: string | null;
   homeTeam?: FootballDataTeam | null;
   awayTeam?: FootballDataTeam | null;
   score?: {
@@ -73,6 +98,19 @@ export interface SyncFootballDataResultsResult {
   checked: number;
   finalized: number;
   notified: number;
+  requestsAvailable?: string | null;
+  requestCounterReset?: string | null;
+  errors: string[];
+}
+
+export interface ImportFootballDataMatchesResult {
+  status: "not_configured" | "no_matches" | "processed" | "error";
+  message: string;
+  stage: string | null;
+  received: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
   requestsAvailable?: string | null;
   requestCounterReset?: string | null;
   errors: string[];
@@ -134,6 +172,28 @@ function getTeamCodeFromName(name: string | null | undefined): string | null {
   return getTeamInfoByName(name)?.code ?? null;
 }
 
+function normalizeRequestedStage(stage: string | null | undefined): string | null {
+  const normalized = stage?.trim().toUpperCase();
+  if (!normalized) {
+    return null;
+  }
+
+  return STAGE_ALIASES[normalized] ?? normalized;
+}
+
+function getLocalTeamName(team: FootballDataTeam | null | undefined): string | null {
+  if (!team) {
+    return null;
+  }
+
+  const teamInfo =
+    getTeamInfoByCode(team.tla) ??
+    getTeamInfoByName(team.name) ??
+    getTeamInfoByName(team.shortName);
+
+  return teamInfo?.name ?? null;
+}
+
 function getTeamCodeFromApiTeam(team: FootballDataTeam | null | undefined): string | null {
   if (!team) {
     return null;
@@ -144,6 +204,38 @@ function getTeamCodeFromApiTeam(team: FootballDataTeam | null | undefined): stri
   }
 
   return getTeamCodeFromName(team.name) ?? getTeamCodeFromName(team.shortName ?? "");
+}
+
+function getKnockoutStageConfig(
+  apiStage: string | null | undefined,
+): { apiStage: string; localStage: MatchStage; firstMatchNumber: number } | null {
+  const normalized = normalizeRequestedStage(apiStage);
+  if (!normalized) {
+    return null;
+  }
+
+  const config = KNOCKOUT_STAGE_CONFIG[normalized];
+  return config ? { apiStage: normalized, ...config } : null;
+}
+
+function buildExternalMatchNumbers(apiMatches: FootballDataMatch[]): Map<number, number> {
+  const numbers = new Map<number, number>();
+
+  for (const [apiStage, config] of Object.entries(KNOCKOUT_STAGE_CONFIG)) {
+    const stageMatches = apiMatches
+      .filter((match) => normalizeRequestedStage(match.stage) === apiStage)
+      .sort((left, right) => {
+        const kickoffDiff =
+          new Date(left.utcDate).getTime() - new Date(right.utcDate).getTime();
+        return kickoffDiff !== 0 ? kickoffDiff : left.id - right.id;
+      });
+
+    stageMatches.forEach((match, index) => {
+      numbers.set(match.id, config.firstMatchNumber + index);
+    });
+  }
+
+  return numbers;
 }
 
 function isSameFixture(localMatch: LocalMatchRow, apiMatch: FootballDataMatch): boolean {
@@ -201,11 +293,12 @@ function getFinishedScore(match: FootballDataMatch): { home: number; away: numbe
 
 async function fetchCompetitionMatches(
   config: FootballDataConfig,
+  stage?: string | null,
 ): Promise<FootballDataRequestResult<FootballDataMatchesResponse>> {
   return footballDataRequest<FootballDataMatchesResponse>(
     config,
     `/competitions/${config.competition}/matches`,
-    { season: config.season },
+    { season: config.season, stage: normalizeRequestedStage(stage) },
   );
 }
 
@@ -296,6 +389,265 @@ async function fetchMatchesByExternalIds(
     { ids: externalIds.join(",") },
     { "X-Unfold-Goals": "true" },
   );
+}
+
+export async function importFootballDataKnockoutMatches(
+  stage?: string | null,
+): Promise<ImportFootballDataMatchesResult> {
+  const config = getConfig();
+  const requestedStage = normalizeRequestedStage(stage);
+
+  if (!config) {
+    return {
+      status: "not_configured",
+      message: "Configure FOOTBALL_DATA_API_TOKEN para importar os jogos.",
+      stage: requestedStage,
+      received: 0,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [],
+    };
+  }
+
+  if (requestedStage && !KNOCKOUT_STAGE_CONFIG[requestedStage]) {
+    return {
+      status: "error",
+      message: `Fase ${requestedStage} nao suportada para importacao.`,
+      stage: requestedStage,
+      received: 0,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [
+        "Use LAST_32, LAST_16, QUARTER_FINALS, SEMI_FINALS, THIRD_PLACE ou FINAL.",
+      ],
+    };
+  }
+
+  const pool = getPool();
+  if (!pool) {
+    return {
+      status: "not_configured",
+      message: "Configure DATABASE_URL para importar os jogos.",
+      stage: requestedStage,
+      received: 0,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [],
+    };
+  }
+
+  const response = await fetchCompetitionMatches(config, requestedStage);
+  const apiMatches = (response.data.matches ?? []).filter((match) => {
+    const stageConfig = getKnockoutStageConfig(match.stage);
+    return Boolean(
+      stageConfig && (!requestedStage || stageConfig.apiStage === requestedStage),
+    );
+  });
+
+  if (apiMatches.length === 0) {
+    return {
+      status: "no_matches",
+      message: requestedStage
+        ? `A football-data.org ainda nao retornou jogos para ${requestedStage}.`
+        : "A football-data.org ainda nao retornou jogos eliminatorios.",
+      stage: requestedStage,
+      received: 0,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      requestsAvailable: response.requestsAvailable,
+      requestCounterReset: response.requestCounterReset,
+      errors: [],
+    };
+  }
+
+  const matchNumbers = buildExternalMatchNumbers(apiMatches);
+  const client = await pool.connect();
+
+  try {
+    const existingResult = await client.query<ExistingMatchIdentity>(
+      `
+        SELECT id, match_number, external_match_id
+        FROM public.matches
+        WHERE (
+          external_provider = $1
+          AND external_match_id IS NOT NULL
+        )
+        OR match_number BETWEEN 73 AND 104
+      `,
+      [PROVIDER],
+    );
+    const existingByExternalId = new Map(
+      existingResult.rows
+        .filter((match) => Boolean(match.external_match_id))
+        .map((match) => [String(match.external_match_id), match]),
+    );
+    const existingByMatchNumber = new Map(
+      existingResult.rows
+        .filter((match) => typeof match.match_number === "number")
+        .map((match) => [Number(match.match_number), match]),
+    );
+
+    let inserted = 0;
+    let updated = 0;
+    let skipped = 0;
+    const errors: string[] = [];
+    const checkedAt = new Date().toISOString();
+
+    for (const apiMatch of apiMatches) {
+      const stageConfig = getKnockoutStageConfig(apiMatch.stage);
+      const homeTeam = getLocalTeamName(apiMatch.homeTeam);
+      const awayTeam = getLocalTeamName(apiMatch.awayTeam);
+      const matchNumber = matchNumbers.get(apiMatch.id) ?? null;
+      const kickoffAt = new Date(apiMatch.utcDate);
+
+      if (
+        !stageConfig ||
+        !homeTeam ||
+        !awayTeam ||
+        homeTeam === awayTeam ||
+        Number.isNaN(kickoffAt.getTime())
+      ) {
+        skipped += 1;
+        continue;
+      }
+
+      const externalMatchId = String(apiMatch.id);
+      const existing =
+        existingByExternalId.get(externalMatchId) ??
+        (matchNumber ? existingByMatchNumber.get(matchNumber) : null);
+
+      try {
+        if (existing) {
+          await client.query(
+            `
+              UPDATE public.matches
+              SET
+                stage = $1,
+                group_name = null,
+                match_number = coalesce(match_number, $2),
+                round_number = null,
+                home_team = $3,
+                away_team = $4,
+                kickoff_at = $5,
+                venue = coalesce($6, venue),
+                external_provider = $7,
+                external_match_id = $8,
+                external_mapping_checked_at = $9,
+                live_status = $10
+              WHERE id = $11
+            `,
+            [
+              stageConfig.localStage,
+              matchNumber,
+              homeTeam,
+              awayTeam,
+              kickoffAt.toISOString(),
+              apiMatch.venue?.trim() || null,
+              PROVIDER,
+              externalMatchId,
+              checkedAt,
+              apiMatch.status,
+              existing.id,
+            ],
+          );
+          existingByExternalId.set(externalMatchId, {
+            ...existing,
+            external_match_id: externalMatchId,
+          });
+          updated += 1;
+          continue;
+        }
+
+        const insertResult = await client.query<ExistingMatchIdentity>(
+          `
+            INSERT INTO public.matches (
+              stage,
+              group_name,
+              match_number,
+              round_number,
+              home_team,
+              away_team,
+              kickoff_at,
+              is_closed,
+              home_score,
+              away_score,
+              venue,
+              external_provider,
+              external_match_id,
+              external_mapping_checked_at,
+              live_status
+            )
+            VALUES (
+              $1,
+              null,
+              $2,
+              null,
+              $3,
+              $4,
+              $5,
+              false,
+              null,
+              null,
+              $6,
+              $7,
+              $8,
+              $9,
+              $10
+            )
+            RETURNING id, match_number, external_match_id
+          `,
+          [
+            stageConfig.localStage,
+            matchNumber,
+            homeTeam,
+            awayTeam,
+            kickoffAt.toISOString(),
+            apiMatch.venue?.trim() || null,
+            PROVIDER,
+            externalMatchId,
+            checkedAt,
+            apiMatch.status,
+          ],
+        );
+        const insertedMatch = insertResult.rows[0];
+        if (insertedMatch) {
+          existingByExternalId.set(externalMatchId, insertedMatch);
+          if (typeof insertedMatch.match_number === "number") {
+            existingByMatchNumber.set(insertedMatch.match_number, insertedMatch);
+          }
+        }
+        inserted += 1;
+      } catch (error) {
+        errors.push(
+          error instanceof Error
+            ? `Jogo externo ${externalMatchId}: ${error.message}`
+            : `Jogo externo ${externalMatchId}: falha ao importar.`,
+        );
+      }
+    }
+
+    const status =
+      errors.length > 0 && inserted + updated === 0 ? "error" : "processed";
+
+    return {
+      status,
+      message: `${inserted} jogo(s) inserido(s), ${updated} atualizado(s) e ${skipped} aguardando participantes.`,
+      stage: requestedStage,
+      received: apiMatches.length,
+      inserted,
+      updated,
+      skipped,
+      requestsAvailable: response.requestsAvailable,
+      requestCounterReset: response.requestCounterReset,
+      errors,
+    };
+  } finally {
+    client.release();
+  }
 }
 
 export async function syncFootballDataFinalResults(

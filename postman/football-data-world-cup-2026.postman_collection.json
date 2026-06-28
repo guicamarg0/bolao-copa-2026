@@ -60,6 +60,11 @@
           "type": "string"
         },
         {
+          "key": "knockoutStage",
+          "value": "LAST_32",
+          "type": "string"
+        },
+        {
           "key": "matchDate",
           "value": "2026-06-11",
           "type": "string"
@@ -253,6 +258,41 @@
                   }
                 }
               ]
+            },
+            {
+              "name": "Jogos por fase eliminatoria",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Auth-Token",
+                    "value": "{{footballDataToken}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{footballDataBaseUrl}}/competitions/{{competitionCode}}/matches?season={{season}}&stage={{knockoutStage}}",
+                  "host": [
+                    "{{footballDataBaseUrl}}"
+                  ],
+                  "path": [
+                    "competitions",
+                    "{{competitionCode}}",
+                    "matches"
+                  ],
+                  "query": [
+                    {
+                      "key": "season",
+                      "value": "{{season}}"
+                    },
+                    {
+                      "key": "stage",
+                      "value": "{{knockoutStage}}"
+                    }
+                  ]
+                },
+                "description": "Use LAST_32 para os 32 avos e LAST_16 para as oitavas. Copie os ids retornados ou use a rota de importacao do WorldBet."
+              }
             },
             {
               "name": "Times da Copa 2026",
