@@ -2,6 +2,7 @@ import "server-only";
 
 import type { PoolClient } from "pg";
 import { getPool, notifyFinishedMatchResult } from "@/lib/match-prediction-report";
+import { settleQualificationBets } from "@/lib/qualification-bets";
 import { getTeamInfoByCode, getTeamInfoByName } from "@/lib/teams";
 import type { MatchStage } from "@/lib/types";
 
@@ -36,6 +37,9 @@ interface LocalMatchRow {
   away_team: string | null;
   kickoff_at: string;
   external_match_id: string | null;
+  stage?: MatchStage;
+  is_closed?: boolean;
+  bets_settled_at?: string | null;
 }
 
 interface ExistingMatchIdentity {
@@ -63,6 +67,8 @@ interface FootballDataMatch {
   homeTeam?: FootballDataTeam | null;
   awayTeam?: FootballDataTeam | null;
   score?: {
+    winner?: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
+    duration?: string | null;
     fullTime?: {
       home?: number | null;
       away?: number | null;
@@ -289,6 +295,18 @@ function getFinishedScore(match: FootballDataMatch): { home: number; away: numbe
   }
 
   return { home, away };
+}
+
+function getQualifiedSide(
+  match: FootballDataMatch,
+): "home" | "away" | null {
+  if (match.score?.winner === "HOME_TEAM") {
+    return "home";
+  }
+  if (match.score?.winner === "AWAY_TEAM") {
+    return "away";
+  }
+  return null;
 }
 
 async function fetchCompetitionMatches(
@@ -684,11 +702,23 @@ export async function syncFootballDataFinalResults(
     const mapping = await mapExternalMatches(client, config);
     const candidatesResult = await client.query<LocalMatchRow>(
       `
-        SELECT id, match_number, home_team, away_team, kickoff_at, external_match_id
+        SELECT
+          id,
+          match_number,
+          home_team,
+          away_team,
+          kickoff_at,
+          external_match_id,
+          stage,
+          is_closed,
+          bets_settled_at
         FROM public.matches
         WHERE external_provider = $1
           AND external_match_id IS NOT NULL
-          AND is_closed = false
+          AND (
+            is_closed = false
+            OR (stage <> 'group' AND bets_settled_at IS NULL)
+          )
           AND kickoff_at <= $2
         ORDER BY kickoff_at ASC
         LIMIT ${MAX_MATCHES_PER_SYNC}
@@ -749,6 +779,7 @@ export async function syncFootballDataFinalResults(
         continue;
       }
 
+      const qualifiedSide = getQualifiedSide(apiMatch);
       const updateResult = await client.query(
         `
           UPDATE public.matches
@@ -758,15 +789,16 @@ export async function syncFootballDataFinalResults(
             is_closed = true,
             predictions_closed_at = coalesce(predictions_closed_at, $3),
             live_status = $4,
-            result_synced_at = $3
-          WHERE id = $5
-            AND is_closed = false
+            result_synced_at = $3,
+            qualified_side = coalesce($5, qualified_side)
+          WHERE id = $6
         `,
         [
           finishedScore.home,
           finishedScore.away,
           now.toISOString(),
           apiMatch.status,
+          qualifiedSide,
           localMatch.id,
         ],
       );
@@ -775,7 +807,32 @@ export async function syncFootballDataFinalResults(
         continue;
       }
 
-      finalized += 1;
+      if (!localMatch.is_closed) {
+        finalized += 1;
+      }
+
+      if (localMatch.stage !== "group") {
+        if (qualifiedSide) {
+          try {
+            await settleQualificationBets({
+              matchId: localMatch.id,
+              qualifiedSide,
+              settledAt: now,
+            });
+          } catch (error) {
+            errors.push(
+              error instanceof Error
+                ? `Apostas ${localMatch.id}: ${error.message}`
+                : `Apostas ${localMatch.id}: falha ao liquidar.`,
+            );
+          }
+        } else {
+          errors.push(
+            `Apostas ${localMatch.id}: API finalizou sem informar HOME_TEAM/AWAY_TEAM.`,
+          );
+        }
+      }
+
       try {
         const telegramMessageId = await notifyFinishedMatchResult({
           matchId: localMatch.id,

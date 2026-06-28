@@ -24,7 +24,7 @@ export const LOCAL_SESSION_COOKIE_NAME = "bolao_local_session";
 
 const LOCAL_DB_PATH = path.join(process.cwd(), "supabase", "local.sqlite");
 const SESSION_TTL_DAYS = 30;
-const LOCAL_SCHEMA_VERSION = 5;
+const LOCAL_SCHEMA_VERSION = 6;
 
 declare global {
   var __bolaoLocalDb: DatabaseSync | undefined;
@@ -65,6 +65,8 @@ interface LocalMatchRow {
   live_status?: string | null;
   result_synced_at?: string | null;
   result_notified_at?: string | null;
+  qualified_side?: "home" | "away" | null;
+  bets_settled_at?: string | null;
   is_closed: number;
   home_score: number | null;
   away_score: number | null;
@@ -165,6 +167,8 @@ function mapMatchRow(row: LocalMatchRow): Match {
     awayTeam: row.away_team,
     kickoffAt: row.kickoff_at,
     predictionsClosedAt: row.predictions_closed_at,
+    qualifiedSide: row.qualified_side ?? null,
+    betsSettledAt: row.bets_settled_at ?? null,
     isClosed: row.is_closed === 1,
     homeScore: row.home_score,
     awayScore: row.away_score,
@@ -223,6 +227,8 @@ function initializeSchema(db: DatabaseSync) {
       live_status TEXT,
       result_synced_at TEXT,
       result_notified_at TEXT,
+      qualified_side TEXT,
+      bets_settled_at TEXT,
       is_closed INTEGER NOT NULL DEFAULT 0,
       home_score INTEGER,
       away_score INTEGER,
@@ -327,6 +333,8 @@ function initializeSchema(db: DatabaseSync) {
     ["live_status", "TEXT"],
     ["result_synced_at", "TEXT"],
     ["result_notified_at", "TEXT"],
+    ["qualified_side", "TEXT"],
+    ["bets_settled_at", "TEXT"],
   ];
   for (const [columnName, columnType] of optionalMatchColumns) {
     const hasColumn = matchColumns.some((column) => column.name === columnName);

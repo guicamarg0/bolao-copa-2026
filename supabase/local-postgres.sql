@@ -81,6 +81,8 @@ create table if not exists public.matches (
   live_status text,
   result_synced_at timestamptz,
   result_notified_at timestamptz,
+  qualified_side text check (qualified_side is null or qualified_side in ('home', 'away')),
+  bets_settled_at timestamptz,
   is_closed boolean not null default false,
   home_score integer,
   away_score integer,
@@ -123,6 +125,27 @@ alter table public.matches
 alter table public.matches
   add column if not exists result_notified_at timestamptz;
 
+alter table public.matches
+  add column if not exists qualified_side text;
+
+alter table public.matches
+  add column if not exists bets_settled_at timestamptz;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'matches_qualified_side_check'
+      and conrelid = 'public.matches'::regclass
+  ) then
+    alter table public.matches
+      add constraint matches_qualified_side_check
+      check (qualified_side is null or qualified_side in ('home', 'away'));
+  end if;
+end;
+$$;
+
 create unique index if not exists idx_matches_match_number
   on public.matches (match_number);
 
@@ -140,6 +163,26 @@ create table if not exists public.predictions (
   updated_at timestamptz not null default now(),
   unique(user_id, match_id)
 );
+
+create table if not exists public.qualification_bets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.app_users(id) on delete cascade,
+  match_id uuid not null references public.matches(id) on delete cascade,
+  selected_side text not null check (selected_side in ('home', 'away')),
+  stake integer not null check (stake > 0),
+  status text not null default 'active' check (
+    status in ('active', 'cancelled', 'won', 'lost', 'refunded')
+  ),
+  payout integer not null default 0 check (payout >= 0),
+  cancelled_at timestamptz,
+  settled_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(user_id, match_id)
+);
+
+create index if not exists idx_qualification_bets_match_status
+  on public.qualification_bets (match_id, status);
 
 create or replace function public.touch_updated_at()
 returns trigger
@@ -166,6 +209,12 @@ execute function public.touch_updated_at();
 drop trigger if exists trg_predictions_updated_at on public.predictions;
 create trigger trg_predictions_updated_at
 before update on public.predictions
+for each row
+execute function public.touch_updated_at();
+
+drop trigger if exists trg_qualification_bets_updated_at on public.qualification_bets;
+create trigger trg_qualification_bets_updated_at
+before update on public.qualification_bets
 for each row
 execute function public.touch_updated_at();
 
@@ -212,24 +261,69 @@ with scored as (
         and (p.home_goals - p.away_goals) = (m.home_score - m.away_score)
       then 1
       else 0
-    end as goal_diff_hits
+    end as goal_diff_hits,
+    case
+      when
+        not (
+          (p.home_goals > p.away_goals and m.home_score > m.away_score)
+          or (p.home_goals < p.away_goals and m.home_score < m.away_score)
+          or (p.home_goals = p.away_goals and m.home_score = m.away_score)
+        )
+        and (p.home_goals = m.home_score or p.away_goals = m.away_score)
+      then 1
+      else 0
+    end as one_team_goal_hits
   from public.predictions p
   join public.matches m on m.id = p.match_id
   where m.home_score is not null
     and m.away_score is not null
+),
+prediction_totals as (
+  select
+    user_id,
+    coalesce(sum(points), 0)::int as prediction_points,
+    coalesce(sum(exact_scores), 0)::int as exact_scores,
+    coalesce(sum(result_hits), 0)::int as result_hits,
+    coalesce(sum(goal_diff_hits), 0)::int as goal_diff_hits,
+    coalesce(sum(one_team_goal_hits), 0)::int as one_team_goal_hits,
+    coalesce(count(match_id), 0)::int as predictions_count
+  from scored
+  group by user_id
+),
+bet_totals as (
+  select
+    user_id,
+    coalesce(sum(
+      case
+        when status = 'active' then -stake
+        when status = 'lost' then -stake
+        when status = 'won' then payout - stake
+        else 0
+      end
+    ), 0)::int as bet_points,
+    coalesce(sum(case when status = 'active' then stake else 0 end), 0)::int as active_stakes
+  from public.qualification_bets
+  group by user_id
 )
 select
   u.id as user_id,
   u.display_name,
-  coalesce(sum(s.points), 0)::int as total_points,
-  coalesce(sum(s.exact_scores), 0)::int as exact_scores,
-  coalesce(sum(s.result_hits), 0)::int as result_hits,
-  coalesce(sum(s.goal_diff_hits), 0)::int as goal_diff_hits,
-  coalesce(count(s.match_id), 0)::int as predictions_count
+  greatest(
+    0,
+    coalesce(pt.prediction_points, 0) + coalesce(bt.bet_points, 0)
+  )::int as total_points,
+  coalesce(pt.exact_scores, 0)::int as exact_scores,
+  coalesce(pt.result_hits, 0)::int as result_hits,
+  coalesce(pt.goal_diff_hits, 0)::int as goal_diff_hits,
+  coalesce(pt.predictions_count, 0)::int as predictions_count,
+  coalesce(pt.one_team_goal_hits, 0)::int as one_team_goal_hits,
+  coalesce(pt.prediction_points, 0)::int as prediction_points,
+  coalesce(bt.bet_points, 0)::int as bet_points,
+  coalesce(bt.active_stakes, 0)::int as active_stakes
 from public.app_users u
-left join scored s on s.user_id = u.id
+left join prediction_totals pt on pt.user_id = u.id
+left join bet_totals bt on bt.user_id = u.id
 where u.is_active = true
-group by u.id, u.display_name
 order by total_points desc, exact_scores desc, result_hits desc, u.display_name asc;
 
 insert into public.app_users (

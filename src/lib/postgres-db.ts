@@ -2,7 +2,7 @@
 
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { Pool } from "pg";
-import { buildLeaderboard, isPredictionLocked } from "@/lib/scoring";
+import { buildLeaderboard, isPredictionLocked, sortLeaderboard } from "@/lib/scoring";
 import type {
   LeaderboardRow,
   Match,
@@ -15,7 +15,7 @@ import type {
 export const POSTGRES_SESSION_COOKIE_NAME = "bolao_local_session";
 
 const SESSION_TTL_DAYS = 30;
-const POSTGRES_SCHEMA_VERSION = 5;
+const POSTGRES_SCHEMA_VERSION = 6;
 
 declare global {
   var __bolaoPgPool: Pool | undefined;
@@ -57,6 +57,8 @@ interface PostgresMatchRow {
   live_status?: string | null;
   result_synced_at?: string | Date | null;
   result_notified_at?: string | Date | null;
+  qualified_side?: "home" | "away" | null;
+  bets_settled_at?: string | Date | null;
   is_closed: boolean;
   home_score: number | null;
   away_score: number | null;
@@ -185,6 +187,8 @@ function mapMatchRow(row: PostgresMatchRow): Match {
     predictionsClosedAt: row.predictions_closed_at
       ? toIso(row.predictions_closed_at)
       : null,
+    qualifiedSide: row.qualified_side ?? null,
+    betsSettledAt: row.bets_settled_at ? toIso(row.bets_settled_at) : null,
     isClosed: row.is_closed,
     homeScore: row.home_score,
     awayScore: row.away_score,
@@ -314,6 +318,29 @@ async function ensureSchema() {
   await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS live_status text");
   await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS result_synced_at timestamptz");
   await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS result_notified_at timestamptz");
+  await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS qualified_side text");
+  await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS bets_settled_at timestamptz");
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS public.qualification_bets (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id uuid NOT NULL REFERENCES public.app_users(id) ON DELETE CASCADE,
+      match_id uuid NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
+      selected_side text NOT NULL CHECK (selected_side IN ('home', 'away')),
+      stake integer NOT NULL CHECK (stake > 0),
+      status text NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'cancelled', 'won', 'lost', 'refunded')),
+      payout integer NOT NULL DEFAULT 0 CHECK (payout >= 0),
+      cancelled_at timestamptz,
+      settled_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE(user_id, match_id)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_qualification_bets_match_status
+    ON public.qualification_bets (match_id, status)
+  `);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_matches_match_number
     ON public.matches (match_number)
@@ -589,8 +616,38 @@ export async function getPostgresLeaderboard(): Promise<LeaderboardRow[]> {
     getPostgresMatches(),
     getPostgresAllPredictions(),
   ]);
+  const rows = buildLeaderboard(profiles, matches, predictions);
+  await ensureSchema();
+  const pool = getPool();
+  const betResult = await pool.query<{ user_id: string; bet_points: number }>(
+    `
+      SELECT
+        user_id,
+        coalesce(sum(
+          CASE
+            WHEN status = 'active' THEN -stake
+            WHEN status = 'lost' THEN -stake
+            WHEN status = 'won' THEN payout - stake
+            ELSE 0
+          END
+        ), 0)::int AS bet_points
+      FROM public.qualification_bets
+      GROUP BY user_id
+    `,
+  );
+  const betPointsByUser = new Map(
+    betResult.rows.map((row) => [row.user_id, Number(row.bet_points)]),
+  );
 
-  return buildLeaderboard(profiles, matches, predictions);
+  return sortLeaderboard(
+    rows.map((row) => ({
+      ...row,
+      totalPoints: Math.max(
+        0,
+        row.totalPoints + (betPointsByUser.get(row.userId) ?? 0),
+      ),
+    })),
+  );
 }
 
 export async function upsertPostgresPrediction(params: {

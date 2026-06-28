@@ -14,6 +14,7 @@ const navItems: ShellNavItem[] = [
   { href: "/jogos", label: "Jogos", icon: "matches" },
   { href: "/palpites", label: "Palpites", icon: "predictions" },
   { href: "/palpites-fechados", label: "Palpites Fechados", icon: "predictions" },
+  { href: "/apostas", label: "Apostas", icon: "bets" },
   { href: "/ranking", label: "Rankings", icon: "rankings" },
   { href: "/historico", label: "Historico", icon: "history" },
   { href: "/perfil", label: "Meu Perfil", icon: "profile" },

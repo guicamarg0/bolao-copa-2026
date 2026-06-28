@@ -130,7 +130,9 @@ export default async function HistoricoPage({
             </p>
           </Surface>
           <Surface className="p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-300">Pontuacao total</p>
+            <p className="text-xs uppercase tracking-wide text-slate-300">
+              Pontos em palpites
+            </p>
             <p className="font-display text-4xl leading-none md:text-5xl">
               {runningTotal}
             </p>

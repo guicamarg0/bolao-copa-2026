@@ -25,6 +25,10 @@ import { getMatches, getProfiles } from "@/lib/data";
 import { parseMatchesCsv } from "@/lib/match-csv";
 import { notifyFinishedMatchResult } from "@/lib/match-prediction-report";
 import { STAGE_LABEL } from "@/lib/match-ui";
+import {
+  reopenQualificationBets,
+  settleQualificationBets,
+} from "@/lib/qualification-bets";
 import { getStorageMode } from "@/lib/storage-mode";
 import { isSupabaseConfigured } from "@/lib/supabase-env";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -359,8 +363,26 @@ async function saveOfficialResult(formData: FormData) {
   const matchId = String(formData.get("match_id") ?? "");
   const homeScore = Number(formData.get("home_score"));
   const awayScore = Number(formData.get("away_score"));
+  const qualifiedSideRaw = String(formData.get("qualified_side") ?? "");
 
   if (!matchId || !Number.isInteger(homeScore) || !Number.isInteger(awayScore)) {
+    return;
+  }
+
+  const currentMatch = (await getMatches()).find((match) => match.id === matchId);
+  if (!currentMatch) {
+    return;
+  }
+  const knockout = currentMatch.stage !== "group";
+  const qualifiedSide =
+    qualifiedSideRaw === "home" || qualifiedSideRaw === "away"
+      ? qualifiedSideRaw
+      : homeScore > awayScore
+        ? "home"
+        : awayScore > homeScore
+          ? "away"
+          : null;
+  if (knockout && !qualifiedSide) {
     return;
   }
 
@@ -377,11 +399,20 @@ async function saveOfficialResult(formData: FormData) {
         home_score: homeScore,
         away_score: awayScore,
         is_closed: true,
+        qualified_side: knockout ? qualifiedSide : null,
       })
       .eq("id", matchId);
   } else {
     await requireAppAdmin();
     await closeAppMatch(matchId, homeScore, awayScore);
+  }
+
+  if (knockout && qualifiedSide) {
+    await settleQualificationBets({
+      matchId,
+      qualifiedSide,
+      force: true,
+    });
   }
 
   await notifyFinishedMatchResult({ matchId, homeScore, awayScore }).catch(() => null);
@@ -391,6 +422,8 @@ async function saveOfficialResult(formData: FormData) {
   revalidatePath("/palpites");
   revalidatePath("/palpites-fechados");
   revalidatePath("/ranking");
+  revalidatePath("/apostas");
+  revalidatePath("/historico");
   revalidatePath("/admin");
 }
 
@@ -415,6 +448,8 @@ async function reopenMatch(formData: FormData) {
         home_score: null,
         away_score: null,
         is_closed: false,
+        qualified_side: null,
+        bets_settled_at: null,
       })
       .eq("id", matchId);
   } else {
@@ -422,11 +457,15 @@ async function reopenMatch(formData: FormData) {
     await reopenAppMatch(matchId);
   }
 
+  await reopenQualificationBets(matchId).catch(() => null);
+
   revalidatePath("/");
   revalidatePath("/jogos");
   revalidatePath("/palpites");
   revalidatePath("/palpites-fechados");
   revalidatePath("/ranking");
+  revalidatePath("/apostas");
+  revalidatePath("/historico");
   revalidatePath("/admin");
 }
 
@@ -955,7 +994,7 @@ export default async function AdminPage({
                     </div>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-[auto_auto_auto] md:items-end">
+                  <div className="grid gap-3 md:grid-cols-[auto_auto_minmax(180px,1fr)_auto] md:items-end">
                     <label className="space-y-1 text-xs uppercase tracking-wide text-slate-300">
                       Gols {match.homeTeam}
                       <Input
@@ -980,6 +1019,25 @@ export default async function AdminPage({
                         disabled={!viewer.isAdmin}
                       />
                     </label>
+                    {match.stage !== "group" ? (
+                      <label className="space-y-1 text-xs uppercase tracking-wide text-slate-300">
+                        Classificado
+                        <Select
+                          name="qualified_side"
+                          required
+                          defaultValue={match.qualifiedSide ?? ""}
+                          disabled={!viewer.isAdmin}
+                        >
+                          <option value="" disabled>
+                            Selecione
+                          </option>
+                          <option value="home">{match.homeTeam}</option>
+                          <option value="away">{match.awayTeam}</option>
+                        </Select>
+                      </label>
+                    ) : (
+                      <div />
+                    )}
                     <Button type="submit" variant="success" disabled={!viewer.isAdmin}>
                       Salvar resultado
                     </Button>

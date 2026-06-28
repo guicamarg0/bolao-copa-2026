@@ -54,6 +54,11 @@ function mapMatchRow(row: Record<string, unknown>): Match {
     predictionsClosedAt: row.predictions_closed_at
       ? String(row.predictions_closed_at)
       : null,
+    qualifiedSide:
+      row.qualified_side === "home" || row.qualified_side === "away"
+        ? row.qualified_side
+        : null,
+    betsSettledAt: row.bets_settled_at ? String(row.bets_settled_at) : null,
     isClosed: typeof row.is_closed === "boolean" ? row.is_closed : hasScore,
     homeScore: typeof row.home_score === "number" ? row.home_score : null,
     awayScore: typeof row.away_score === "number" ? row.away_score : null,

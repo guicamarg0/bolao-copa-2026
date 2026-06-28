@@ -13,6 +13,7 @@ import {
   FiSettings,
   FiShield,
   FiTarget,
+  FiTrendingUp,
   FiUser,
   FiX,
 } from "react-icons/fi";
@@ -23,6 +24,7 @@ export type ShellIconKey =
   | "dashboard"
   | "matches"
   | "predictions"
+  | "bets"
   | "history"
   | "rankings"
   | "profile"
@@ -46,6 +48,7 @@ const iconMap: Record<ShellIconKey, React.ComponentType<{ className?: string }>>
   dashboard: FiGrid,
   matches: FiCalendar,
   predictions: FiTarget,
+  bets: FiTrendingUp,
   history: FiClock,
   rankings: FiBarChart2,
   profile: FiUser,
