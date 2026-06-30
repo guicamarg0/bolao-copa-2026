@@ -8,12 +8,14 @@ import {
   FiTrendingUp,
   FiUsers,
 } from "react-icons/fi";
+import { QualificationBettingInfoButton } from "@/components/qualification-betting-info-button";
 import { TeamPill } from "@/components/team-pill";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { Surface } from "@/components/ui/surface";
 import { cn } from "@/lib/cn";
+import { QUALIFICATION_BET_MIN_STAKE } from "@/lib/qualification-bet-types";
 import type {
   QualificationBetHistoryItem,
   QualificationBetMatch,
@@ -24,6 +26,7 @@ import type {
 import { STAGE_LABEL } from "@/lib/match-ui";
 
 type ViewMode = "open" | "history";
+type HistoryMode = "mine" | "games";
 
 const STATUS_LABEL: Record<QualificationBetStatus, string> = {
   active: "Ativa",
@@ -47,6 +50,10 @@ function toPositiveInteger(value: string): number {
 
 function getSelectedTeam(match: QualificationBetMatch, side: QualificationBetSide): string {
   return side === "home" ? match.homeTeam : match.awayTeam;
+}
+
+function formatSignedPoints(points: number): string {
+  return `${points > 0 ? "+" : ""}${points}`;
 }
 
 function estimateReturn(
@@ -144,6 +151,117 @@ function BetHistoryTable({ history }: { history: QualificationBetHistoryItem[] }
   );
 }
 
+function GameBetHistory({ matches }: { matches: QualificationBetMatch[] }) {
+  if (matches.length === 0) {
+    return (
+      <Surface className="p-8 text-center">
+        <p className="font-semibold">Nenhum jogo com apostas encerradas.</p>
+        <p className="mt-1 text-sm text-[var(--wb-muted)]">
+          Os resultados coletivos aparecerao depois da primeira liquidacao.
+        </p>
+      </Surface>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {matches.map((match) => {
+        const totalPool = match.homePool + match.awayPool;
+        const qualifiedTeam = match.qualifiedSide
+          ? getSelectedTeam(match, match.qualifiedSide)
+          : "Aguardando confirmacao";
+
+        return (
+          <Surface key={`history-${match.id}`} className="overflow-hidden p-4 md:p-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-xs uppercase text-[var(--wb-muted)]">
+                  {STAGE_LABEL[match.stage]}
+                  {match.matchNumber ? ` | Jogo ${match.matchNumber}` : ""}
+                </p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                  <TeamPill teamName={match.homeTeam} />
+                  <span className="text-center font-display text-xl text-[var(--wb-primary)]">
+                    x
+                  </span>
+                  <TeamPill teamName={match.awayTeam} align="right" />
+                </div>
+              </div>
+              <div className="text-sm lg:text-right">
+                <p className="font-semibold text-[var(--wb-text)]">
+                  Classificado: {qualifiedTeam}
+                </p>
+                <p className="text-[var(--wb-muted)]">{formatDateTime(match.kickoffAt)}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-lg bg-blue-50 px-3 py-2 text-sm">
+                <span className="text-[var(--wb-muted)]">{match.homeTeam}</span>
+                <strong className="ml-2">{match.homePool} pts</strong>
+              </div>
+              <div className="rounded-lg bg-red-50 px-3 py-2 text-sm">
+                <span className="text-[var(--wb-muted)]">{match.awayTeam}</span>
+                <strong className="ml-2">{match.awayPool} pts</strong>
+              </div>
+              <div className="rounded-lg bg-[var(--wb-surface-alt)] px-3 py-2 text-sm">
+                <span className="text-[var(--wb-muted)]">Pote total</span>
+                <strong className="ml-2">{totalPool} pts</strong>
+              </div>
+            </div>
+
+            <div className="mt-4 max-h-72 overflow-auto rounded-lg border border-[var(--wb-border)]">
+              <table className="w-full min-w-[760px] border-collapse text-sm">
+                <thead className="sticky top-0 z-10 bg-[var(--wb-surface-alt)] text-left text-xs uppercase text-[var(--wb-muted)]">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Participante</th>
+                    <th className="px-3 py-2 font-semibold">Selecao</th>
+                    <th className="px-3 py-2 text-right font-semibold">Apostado</th>
+                    <th className="px-3 py-2 text-right font-semibold">% do pote</th>
+                    <th className="px-3 py-2 text-right font-semibold">Retorno</th>
+                    <th className="px-3 py-2 text-right font-semibold">Ganho/perda</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--wb-border)]">
+                  {match.bettors.map((bettor) => (
+                    <tr key={`${match.id}-${bettor.userId}`}>
+                      <td className="px-3 py-2 font-semibold">{bettor.displayName}</td>
+                      <td className="px-3 py-2">
+                        {getSelectedTeam(match, bettor.selectedSide)}
+                      </td>
+                      <td className="px-3 py-2 text-right">{bettor.stake}</td>
+                      <td className="px-3 py-2 text-right">
+                        {bettor.potSharePercentage.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        })}
+                        %
+                      </td>
+                      <td className="px-3 py-2 text-right">{bettor.payout}</td>
+                      <td
+                        className={cn(
+                          "px-3 py-2 text-right font-bold",
+                          bettor.netPoints > 0
+                            ? "text-[var(--wb-green)]"
+                            : bettor.netPoints < 0
+                              ? "text-[var(--wb-red)]"
+                              : "text-[var(--wb-muted)]",
+                        )}
+                      >
+                        {formatSignedPoints(bettor.netPoints)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Surface>
+        );
+      })}
+    </div>
+  );
+}
+
 export function QualificationBetsBoard() {
   const [snapshot, setSnapshot] = useState<QualificationBetSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -154,6 +272,7 @@ export function QualificationBetsBoard() {
   >({});
   const [stakeByMatch, setStakeByMatch] = useState<Record<string, string>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("open");
+  const [historyMode, setHistoryMode] = useState<HistoryMode>("mine");
 
   const loadSnapshot = useCallback(async (silent = false) => {
     if (!silent) {
@@ -201,6 +320,16 @@ export function QualificationBetsBoard() {
       (snapshot?.matches ?? []).filter((match) => !match.betsSettledAt),
     [snapshot],
   );
+  const settledMatches = useMemo(
+    () =>
+      (snapshot?.matches ?? [])
+        .filter((match) => match.betsSettledAt && match.bettors.length > 0)
+        .sort(
+          (left, right) =>
+            new Date(right.kickoffAt).getTime() - new Date(left.kickoffAt).getTime(),
+        ),
+    [snapshot],
+  );
 
   async function mutateBet(
     method: "POST" | "DELETE",
@@ -237,7 +366,9 @@ export function QualificationBetsBoard() {
 
   async function placeBet(match: QualificationBetMatch) {
     const selectedSide = selectedSideByMatch[match.id] ?? "home";
-    const stake = toPositiveInteger(stakeByMatch[match.id] ?? "1");
+    const stake = toPositiveInteger(
+      stakeByMatch[match.id] ?? String(QUALIFICATION_BET_MIN_STAKE),
+    );
     await mutateBet(
       "POST",
       {
@@ -332,19 +463,54 @@ export function QualificationBetsBoard() {
             Historico
           </button>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => void loadSnapshot()}
-        >
-          <FiRefreshCw />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <QualificationBettingInfoButton />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => void loadSnapshot()}
+          >
+            <FiRefreshCw />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {viewMode === "history" ? (
-        <BetHistoryTable history={snapshot?.history ?? []} />
+        <div className="space-y-4">
+          <div className="inline-flex rounded-lg border border-[var(--wb-border)] bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setHistoryMode("mine")}
+              className={cn(
+                "rounded-md px-3 py-2 text-sm font-semibold transition",
+                historyMode === "mine"
+                  ? "bg-[var(--wb-primary)] text-white"
+                  : "text-[var(--wb-muted)]",
+              )}
+            >
+              Meu historico
+            </button>
+            <button
+              type="button"
+              onClick={() => setHistoryMode("games")}
+              className={cn(
+                "rounded-md px-3 py-2 text-sm font-semibold transition",
+                historyMode === "games"
+                  ? "bg-[var(--wb-primary)] text-white"
+                  : "text-[var(--wb-muted)]",
+              )}
+            >
+              Historico dos jogos
+            </button>
+          </div>
+          {historyMode === "mine" ? (
+            <BetHistoryTable history={snapshot?.history ?? []} />
+          ) : (
+            <GameBetHistory matches={settledMatches} />
+          )}
+        </div>
       ) : visibleMatches.length === 0 ? (
         <Surface className="p-8 text-center">
           <p className="font-semibold">Nenhum jogo eliminatorio disponivel.</p>
@@ -356,7 +522,9 @@ export function QualificationBetsBoard() {
         <div className="grid gap-4 xl:grid-cols-2">
           {visibleMatches.map((match) => {
             const selectedSide = selectedSideByMatch[match.id] ?? "home";
-            const stake = toPositiveInteger(stakeByMatch[match.id] ?? "1");
+            const stake = toPositiveInteger(
+              stakeByMatch[match.id] ?? String(QUALIFICATION_BET_MIN_STAKE),
+            );
             const estimatedReturn = estimateReturn(match, selectedSide, stake);
             const processing = processingMatchId === match.id;
 
@@ -452,9 +620,12 @@ export function QualificationBetsBoard() {
                       Pontos para apostar
                       <Input
                         type="number"
-                        min={1}
+                        min={QUALIFICATION_BET_MIN_STAKE}
                         max={snapshot?.balance ?? 0}
-                        value={stakeByMatch[match.id] ?? "1"}
+                        value={
+                          stakeByMatch[match.id] ??
+                          String(QUALIFICATION_BET_MIN_STAKE)
+                        }
                         onChange={(event) =>
                           setStakeByMatch((current) => ({
                             ...current,
@@ -470,7 +641,7 @@ export function QualificationBetsBoard() {
                       type="button"
                       disabled={
                         processing ||
-                        stake <= 0 ||
+                        stake < QUALIFICATION_BET_MIN_STAKE ||
                         stake > (snapshot?.balance ?? 0)
                       }
                       onClick={() => void placeBet(match)}

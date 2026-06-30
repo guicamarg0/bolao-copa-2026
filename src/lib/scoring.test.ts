@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildLeaderboard, scorePrediction } from "@/lib/scoring";
-import type { Match, Prediction, Profile } from "@/lib/types";
+import { buildLeaderboard, scorePrediction, sortLeaderboard } from "@/lib/scoring";
+import type { LeaderboardRow, Match, Prediction, Profile } from "@/lib/types";
 
 const finishedMatch: Match = {
   id: "m1",
@@ -169,5 +169,38 @@ describe("buildLeaderboard", () => {
     expect(leaderboard[0].totalPoints).toBe(20);
     expect(leaderboard[1].totalPoints).toBe(15);
     expect(leaderboard[2].totalPoints).toBe(12);
+  });
+});
+
+describe("sortLeaderboard", () => {
+  it("desempata por exatos, diferenca, resultado e saldo de apostas", () => {
+    const base: LeaderboardRow = {
+      userId: "base",
+      displayName: "Base",
+      totalPoints: 10,
+      betPoints: 0,
+      exactScores: 1,
+      goalDiffHits: 1,
+      resultHits: 2,
+      oneTeamGoalHits: 0,
+      predictionsCount: 1,
+    };
+    const rows: LeaderboardRow[] = [
+      { ...base, userId: "bet-low", displayName: "Bet low", betPoints: -2 },
+      { ...base, userId: "result", displayName: "Result", resultHits: 3 },
+      { ...base, userId: "points", displayName: "Points", totalPoints: 11 },
+      { ...base, userId: "difference", displayName: "Difference", goalDiffHits: 2 },
+      { ...base, userId: "exact", displayName: "Exact", exactScores: 2 },
+      { ...base, userId: "bet-high", displayName: "Bet high", betPoints: 5 },
+    ];
+
+    expect(sortLeaderboard(rows).map((row) => row.userId)).toEqual([
+      "points",
+      "exact",
+      "difference",
+      "result",
+      "bet-high",
+      "bet-low",
+    ]);
   });
 });

@@ -36,8 +36,24 @@ function sortRows(rows: LeaderboardRow[], mode: RankingMode): LeaderboardRow[] {
     if (scoreDiff !== 0) {
       return scoreDiff;
     }
+    if (right.exactScores !== left.exactScores) {
+      return right.exactScores - left.exactScores;
+    }
+    if (right.goalDiffHits !== left.goalDiffHits) {
+      return right.goalDiffHits - left.goalDiffHits;
+    }
+    if (right.resultHits !== left.resultHits) {
+      return right.resultHits - left.resultHits;
+    }
+    if (right.betPoints !== left.betPoints) {
+      return right.betPoints - left.betPoints;
+    }
     return left.displayName.localeCompare(right.displayName);
   });
+}
+
+function formatBetPoints(points: number): string {
+  return `${points > 0 ? "+" : ""}${points}`;
 }
 
 function podiumStyle(index: number): string {
@@ -124,6 +140,18 @@ export function LeaderboardTable({ rows }: LeaderboardTableProps) {
                 <FiTrendingUp />
                 <span>{row.exactScores} placares exatos</span>
               </div>
+              <p
+                className={cn(
+                  "mt-1 text-xs font-semibold",
+                  row.betPoints > 0
+                    ? "text-green-300"
+                    : row.betPoints < 0
+                      ? "text-red-300"
+                      : "text-slate-300",
+                )}
+              >
+                Saldo apostas: {formatBetPoints(row.betPoints)} pts
+              </p>
             </Surface>
           </motion.div>
         ))}
@@ -136,6 +164,7 @@ export function LeaderboardTable({ rows }: LeaderboardTableProps) {
               <th className="px-4 py-3">Pos</th>
               <th className="px-4 py-3">Participante</th>
               <th className="px-4 py-3">Pontos</th>
+              <th className="px-4 py-3">Saldo apostas</th>
               <th className="px-4 py-3">Placar exato</th>
               <th className="px-4 py-3">Resultado</th>
               <th className="px-4 py-3">Dif. gols</th>
@@ -154,6 +183,18 @@ export function LeaderboardTable({ rows }: LeaderboardTableProps) {
                 <td className="px-4 py-3 font-semibold">{row.displayName}</td>
                 <td className="px-4 py-3 font-semibold text-blue-200">
                   {scoreByMode(row, mode)}
+                </td>
+                <td
+                  className={cn(
+                    "px-4 py-3 font-semibold",
+                    row.betPoints > 0
+                      ? "text-green-300"
+                      : row.betPoints < 0
+                        ? "text-red-300"
+                        : "text-slate-300",
+                  )}
+                >
+                  {formatBetPoints(row.betPoints)}
                 </td>
                 <td className="px-4 py-3">{row.exactScores}</td>
                 <td className="px-4 py-3">{row.resultHits}</td>
@@ -182,6 +223,18 @@ export function LeaderboardTable({ rows }: LeaderboardTableProps) {
               <p>Resultado: {row.resultHits}</p>
               <p>Dif. gols: {row.goalDiffHits}</p>
               <p>Palpites: {row.predictionsCount}</p>
+              <p
+                className={cn(
+                  "col-span-2 font-semibold",
+                  row.betPoints > 0
+                    ? "text-green-300"
+                    : row.betPoints < 0
+                      ? "text-red-300"
+                      : "text-slate-300",
+                )}
+              >
+                Saldo apostas: {formatBetPoints(row.betPoints)} pts
+              </p>
             </div>
           </Surface>
         ))}

@@ -83,6 +83,7 @@ function mapLeaderboardRow(row: Record<string, unknown>): LeaderboardRow {
     userId: String(row.user_id),
     displayName: String(row.display_name ?? "Participante"),
     totalPoints: Number(row.total_points ?? 0),
+    betPoints: Number(row.bet_points ?? 0),
     exactScores: Number(row.exact_scores ?? 0),
     goalDiffHits: Number(row.goal_diff_hits ?? 0),
     resultHits: Number(row.result_hits ?? 0),

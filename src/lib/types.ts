@@ -79,6 +79,7 @@ export interface LeaderboardRow {
   userId: string;
   displayName: string;
   totalPoints: number;
+  betPoints: number;
   exactScores: number;
   goalDiffHits: number;
   resultHits: number;

@@ -74,6 +74,7 @@ create table if not exists public.matches (
   external_mapping_checked_at timestamptz,
   live_status text,
   result_synced_at timestamptz,
+  result_score_basis text,
   result_notified_at timestamptz,
   qualified_side text check (qualified_side is null or qualified_side in ('home', 'away')),
   bets_settled_at timestamptz,
@@ -118,6 +119,9 @@ alter table public.matches
 
 alter table public.matches
   add column if not exists result_synced_at timestamptz;
+
+alter table public.matches
+  add column if not exists result_score_basis text;
 
 alter table public.matches
   add column if not exists result_notified_at timestamptz;
@@ -208,7 +212,8 @@ create table if not exists public.qualification_bets (
   user_id uuid not null references public.profiles(id) on delete cascade,
   match_id uuid not null references public.matches(id) on delete cascade,
   selected_side text not null check (selected_side in ('home', 'away')),
-  stake integer not null check (stake > 0),
+  stake integer not null constraint qualification_bets_min_stake_check
+    check (stake >= 10),
   status text not null default 'active' check (
     status in ('active', 'cancelled', 'won', 'lost', 'refunded')
   ),
@@ -222,6 +227,21 @@ create table if not exists public.qualification_bets (
 
 create index if not exists idx_qualification_bets_match_status
   on public.qualification_bets (match_id, status);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'qualification_bets_min_stake_check'
+      and conrelid = 'public.qualification_bets'::regclass
+  ) then
+    alter table public.qualification_bets
+      add constraint qualification_bets_min_stake_check
+      check (stake >= 10) not valid;
+  end if;
+end;
+$$;
 
 alter table public.daily_prediction_reports
   add column if not exists telegram_message_id text;
@@ -563,7 +583,13 @@ from public.profiles pr
 left join prediction_totals pt on pt.user_id = pr.id
 left join bet_totals bt on bt.user_id = pr.id
 where pr.is_active = true
-order by total_points desc, exact_scores desc, result_hits desc, pr.display_name asc;
+order by
+  total_points desc,
+  exact_scores desc,
+  goal_diff_hits desc,
+  result_hits desc,
+  bet_points desc,
+  pr.display_name asc;
 
 grant select on public.leaderboard to authenticated;
 grant select on public.qualification_bets to authenticated;

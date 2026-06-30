@@ -2,6 +2,7 @@ import "server-only";
 
 import type { PoolClient } from "pg";
 import { calculateQualificationBetPayouts } from "@/lib/qualification-bet-payout";
+import { QUALIFICATION_BET_MIN_STAKE } from "@/lib/qualification-bet-types";
 import type {
   QualificationBetHistoryItem,
   QualificationBetMatch,
@@ -160,14 +161,22 @@ async function getBalance(client: PoolClient, userId: string): Promise<BalanceRo
   );
 }
 
-function mapBettor(row: BetRow, displayName: string): QualificationBettor {
+function mapBettor(
+  row: BetRow,
+  displayName: string,
+  totalPool: number,
+): QualificationBettor {
+  const stake = Number(row.stake);
+
   return {
     userId: row.user_id,
     displayName,
     selectedSide: row.selected_side,
-    stake: Number(row.stake),
+    stake,
     status: row.status,
     payout: Number(row.payout),
+    netPoints: getNetPoints(row),
+    potSharePercentage: totalPool > 0 ? (stake / totalPool) * 100 : 0,
     createdAt: toIso(row.created_at),
   };
 }
@@ -241,10 +250,18 @@ export async function getQualificationBetSnapshot(
       const matchBets = (betsByMatch.get(match.id) ?? []).filter(
         (bet) => bet.status !== "cancelled",
       );
+      const homePool = matchBets
+        .filter((bet) => bet.selected_side === "home")
+        .reduce((total, bet) => total + Number(bet.stake), 0);
+      const awayPool = matchBets
+        .filter((bet) => bet.selected_side === "away")
+        .reduce((total, bet) => total + Number(bet.stake), 0);
+      const totalPool = homePool + awayPool;
       const bettors = matchBets.map((bet) =>
         mapBettor(
           bet,
           displayNameByUser.get(bet.user_id) ?? "Participante",
+          totalPool,
         ),
       );
       const deadline = getDeadline(match.kickoff_at);
@@ -265,12 +282,8 @@ export async function getQualificationBetSnapshot(
           !match.is_closed &&
           !match.bets_settled_at &&
           now.getTime() < deadline.getTime(),
-        homePool: matchBets
-          .filter((bet) => bet.selected_side === "home")
-          .reduce((total, bet) => total + Number(bet.stake), 0),
-        awayPool: matchBets
-          .filter((bet) => bet.selected_side === "away")
-          .reduce((total, bet) => total + Number(bet.stake), 0),
+        homePool,
+        awayPool,
         bettors,
         myBet:
           bettors.find((bettor) => bettor.userId === userId) ?? null,
@@ -331,8 +344,13 @@ export async function placeQualificationBet(params: {
   if (params.selectedSide !== "home" && params.selectedSide !== "away") {
     throw new Error("Selecao da aposta invalida.");
   }
-  if (!Number.isInteger(params.stake) || params.stake <= 0) {
-    throw new Error("A aposta deve ser um numero inteiro maior que zero.");
+  if (
+    !Number.isInteger(params.stake) ||
+    params.stake < QUALIFICATION_BET_MIN_STAKE
+  ) {
+    throw new Error(
+      `A aposta minima e de ${QUALIFICATION_BET_MIN_STAKE} pontos.`,
+    );
   }
 
   const pool = getPool();

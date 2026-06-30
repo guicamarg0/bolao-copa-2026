@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { PoolClient } from "pg";
+import { getFinishedScore } from "@/lib/football-data-score";
 import { getPool, notifyFinishedMatchResult } from "@/lib/match-prediction-report";
 import { settleQualificationBets } from "@/lib/qualification-bets";
 import { getTeamInfoByCode, getTeamInfoByName } from "@/lib/teams";
@@ -40,6 +41,7 @@ interface LocalMatchRow {
   stage?: MatchStage;
   is_closed?: boolean;
   bets_settled_at?: string | null;
+  result_score_basis?: string | null;
 }
 
 interface ExistingMatchIdentity {
@@ -280,21 +282,6 @@ function getClosestApiMatch(
   }
 
   return closest.apiMatch;
-}
-
-function getFinishedScore(match: FootballDataMatch): { home: number; away: number } | null {
-  if (match.status !== "FINISHED") {
-    return null;
-  }
-
-  const fullTime = match.score?.fullTime ?? match.score?.regularTime;
-  const home = fullTime?.home;
-  const away = fullTime?.away;
-  if (typeof home !== "number" || typeof away !== "number") {
-    return null;
-  }
-
-  return { home, away };
 }
 
 function getQualifiedSide(
@@ -711,13 +698,20 @@ export async function syncFootballDataFinalResults(
           external_match_id,
           stage,
           is_closed,
-          bets_settled_at
+          bets_settled_at,
+          result_score_basis
         FROM public.matches
         WHERE external_provider = $1
           AND external_match_id IS NOT NULL
           AND (
             is_closed = false
-            OR (stage <> 'group' AND bets_settled_at IS NULL)
+            OR (
+              stage <> 'group'
+              AND (
+                bets_settled_at IS NULL
+                OR result_score_basis IS NULL
+              )
+            )
           )
           AND kickoff_at <= $2
         ORDER BY kickoff_at ASC
@@ -790,7 +784,8 @@ export async function syncFootballDataFinalResults(
             predictions_closed_at = coalesce(predictions_closed_at, $3),
             live_status = $4,
             result_synced_at = $3,
-            qualified_side = coalesce($5, qualified_side)
+            qualified_side = coalesce($5, qualified_side),
+            result_score_basis = 'regular_time'
           WHERE id = $6
         `,
         [

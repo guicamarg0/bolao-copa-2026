@@ -1,5 +1,7 @@
 import type { MatchStage } from "@/lib/types";
 
+export const QUALIFICATION_BET_MIN_STAKE = 10;
+
 export type QualificationBetSide = "home" | "away";
 export type QualificationBetStatus =
   | "active"
@@ -15,6 +17,8 @@ export interface QualificationBettor {
   stake: number;
   status: QualificationBetStatus;
   payout: number;
+  netPoints: number;
+  potSharePercentage: number;
   createdAt: string;
 }
 

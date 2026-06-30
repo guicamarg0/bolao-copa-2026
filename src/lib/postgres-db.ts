@@ -15,7 +15,7 @@ import type {
 export const POSTGRES_SESSION_COOKIE_NAME = "bolao_local_session";
 
 const SESSION_TTL_DAYS = 30;
-const POSTGRES_SCHEMA_VERSION = 6;
+const POSTGRES_SCHEMA_VERSION = 8;
 
 declare global {
   var __bolaoPgPool: Pool | undefined;
@@ -317,6 +317,7 @@ async function ensureSchema() {
   );
   await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS live_status text");
   await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS result_synced_at timestamptz");
+  await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS result_score_basis text");
   await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS result_notified_at timestamptz");
   await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS qualified_side text");
   await pool.query("ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS bets_settled_at timestamptz");
@@ -326,7 +327,8 @@ async function ensureSchema() {
       user_id uuid NOT NULL REFERENCES public.app_users(id) ON DELETE CASCADE,
       match_id uuid NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
       selected_side text NOT NULL CHECK (selected_side IN ('home', 'away')),
-      stake integer NOT NULL CHECK (stake > 0),
+      stake integer NOT NULL CONSTRAINT qualification_bets_min_stake_check
+        CHECK (stake >= 10),
       status text NOT NULL DEFAULT 'active'
         CHECK (status IN ('active', 'cancelled', 'won', 'lost', 'refunded')),
       payout integer NOT NULL DEFAULT 0 CHECK (payout >= 0),
@@ -340,6 +342,22 @@ async function ensureSchema() {
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_qualification_bets_match_status
     ON public.qualification_bets (match_id, status)
+  `);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'qualification_bets_min_stake_check'
+          AND conrelid = 'public.qualification_bets'::regclass
+      ) THEN
+        ALTER TABLE public.qualification_bets
+          ADD CONSTRAINT qualification_bets_min_stake_check
+          CHECK (stake >= 10) NOT VALID;
+      END IF;
+    END;
+    $$
   `);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_matches_match_number
@@ -642,6 +660,7 @@ export async function getPostgresLeaderboard(): Promise<LeaderboardRow[]> {
   return sortLeaderboard(
     rows.map((row) => ({
       ...row,
+      betPoints: betPointsByUser.get(row.userId) ?? 0,
       totalPoints: Math.max(
         0,
         row.totalPoints + (betPointsByUser.get(row.userId) ?? 0),

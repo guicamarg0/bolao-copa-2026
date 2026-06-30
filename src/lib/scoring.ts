@@ -124,8 +124,14 @@ export function sortLeaderboard(rows: LeaderboardRow[]): LeaderboardRow[] {
     if (right.exactScores !== left.exactScores) {
       return right.exactScores - left.exactScores;
     }
+    if (right.goalDiffHits !== left.goalDiffHits) {
+      return right.goalDiffHits - left.goalDiffHits;
+    }
     if (right.resultHits !== left.resultHits) {
       return right.resultHits - left.resultHits;
+    }
+    if (right.betPoints !== left.betPoints) {
+      return right.betPoints - left.betPoints;
     }
     return left.displayName.localeCompare(right.displayName, "pt-BR");
   });
@@ -147,6 +153,7 @@ export function buildLeaderboard(
       userId: profile.id,
       displayName: profile.displayName,
       totalPoints: 0,
+      betPoints: 0,
       exactScores: 0,
       goalDiffHits: 0,
       resultHits: 0,
@@ -166,6 +173,7 @@ export function buildLeaderboard(
         userId: prediction.userId,
         displayName: "Participante",
         totalPoints: 0,
+        betPoints: 0,
         exactScores: 0,
         goalDiffHits: 0,
         resultHits: 0,
