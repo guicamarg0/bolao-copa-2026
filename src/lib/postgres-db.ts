@@ -15,7 +15,7 @@ import type {
 export const POSTGRES_SESSION_COOKIE_NAME = "bolao_local_session";
 
 const SESSION_TTL_DAYS = 30;
-const POSTGRES_SCHEMA_VERSION = 8;
+const POSTGRES_SCHEMA_VERSION = 9;
 
 declare global {
   var __bolaoPgPool: Pool | undefined;
@@ -327,8 +327,7 @@ async function ensureSchema() {
       user_id uuid NOT NULL REFERENCES public.app_users(id) ON DELETE CASCADE,
       match_id uuid NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
       selected_side text NOT NULL CHECK (selected_side IN ('home', 'away')),
-      stake integer NOT NULL CONSTRAINT qualification_bets_min_stake_check
-        CHECK (stake >= 10),
+      stake integer NOT NULL CHECK (stake > 0),
       status text NOT NULL DEFAULT 'active'
         CHECK (status IN ('active', 'cancelled', 'won', 'lost', 'refunded')),
       payout integer NOT NULL DEFAULT 0 CHECK (payout >= 0),
@@ -344,20 +343,32 @@ async function ensureSchema() {
     ON public.qualification_bets (match_id, status)
   `);
   await pool.query(`
-    DO $$
+    ALTER TABLE public.qualification_bets
+    DROP CONSTRAINT IF EXISTS qualification_bets_min_stake_check
+  `);
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION public.enforce_qualification_bet_min_stake()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
     BEGIN
-      IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'qualification_bets_min_stake_check'
-          AND conrelid = 'public.qualification_bets'::regclass
-      ) THEN
-        ALTER TABLE public.qualification_bets
-          ADD CONSTRAINT qualification_bets_min_stake_check
-          CHECK (stake >= 10) NOT VALID;
+      IF NEW.stake < 10 THEN
+        RAISE EXCEPTION 'A aposta minima e de 10 pontos.'
+          USING ERRCODE = '23514';
       END IF;
+      RETURN NEW;
     END;
     $$
+  `);
+  await pool.query(`
+    DROP TRIGGER IF EXISTS trg_qualification_bets_min_stake
+    ON public.qualification_bets
+  `);
+  await pool.query(`
+    CREATE TRIGGER trg_qualification_bets_min_stake
+    BEFORE INSERT OR UPDATE OF stake ON public.qualification_bets
+    FOR EACH ROW
+    EXECUTE FUNCTION public.enforce_qualification_bet_min_stake()
   `);
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS idx_matches_match_number

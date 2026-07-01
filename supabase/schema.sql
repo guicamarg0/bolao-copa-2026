@@ -212,8 +212,7 @@ create table if not exists public.qualification_bets (
   user_id uuid not null references public.profiles(id) on delete cascade,
   match_id uuid not null references public.matches(id) on delete cascade,
   selected_side text not null check (selected_side in ('home', 'away')),
-  stake integer not null constraint qualification_bets_min_stake_check
-    check (stake >= 10),
+  stake integer not null check (stake > 0),
   status text not null default 'active' check (
     status in ('active', 'cancelled', 'won', 'lost', 'refunded')
   ),
@@ -228,20 +227,28 @@ create table if not exists public.qualification_bets (
 create index if not exists idx_qualification_bets_match_status
   on public.qualification_bets (match_id, status);
 
-do $$
+alter table public.qualification_bets
+  drop constraint if exists qualification_bets_min_stake_check;
+
+create or replace function public.enforce_qualification_bet_min_stake()
+returns trigger
+language plpgsql
+as $$
 begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'qualification_bets_min_stake_check'
-      and conrelid = 'public.qualification_bets'::regclass
-  ) then
-    alter table public.qualification_bets
-      add constraint qualification_bets_min_stake_check
-      check (stake >= 10) not valid;
+  if new.stake < 10 then
+    raise exception 'A aposta minima e de 10 pontos.'
+      using errcode = '23514';
   end if;
+  return new;
 end;
 $$;
+
+drop trigger if exists trg_qualification_bets_min_stake
+  on public.qualification_bets;
+create trigger trg_qualification_bets_min_stake
+before insert or update of stake on public.qualification_bets
+for each row
+execute function public.enforce_qualification_bet_min_stake();
 
 alter table public.daily_prediction_reports
   add column if not exists telegram_message_id text;

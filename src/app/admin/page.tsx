@@ -366,12 +366,12 @@ async function saveOfficialResult(formData: FormData) {
   const qualifiedSideRaw = String(formData.get("qualified_side") ?? "");
 
   if (!matchId || !Number.isInteger(homeScore) || !Number.isInteger(awayScore)) {
-    return;
+    redirect("/admin?result_error=Informe%20um%20placar%20valido.");
   }
 
   const currentMatch = (await getMatches()).find((match) => match.id === matchId);
   if (!currentMatch) {
-    return;
+    redirect("/admin?result_error=Jogo%20nao%20encontrado.");
   }
   const knockout = currentMatch.stage !== "group";
   const qualifiedSide =
@@ -383,36 +383,45 @@ async function saveOfficialResult(formData: FormData) {
           ? "away"
           : null;
   if (knockout && !qualifiedSide) {
-    return;
+    redirect("/admin?result_error=Selecione%20a%20equipe%20classificada.");
   }
 
-  if (isSupabaseConfigured()) {
-    await requireSupabaseAdmin();
-    const client = await getSupabaseServerClient();
-    if (!client) {
-      return;
+  try {
+    if (isSupabaseConfigured()) {
+      await requireSupabaseAdmin();
+      const client = await getSupabaseServerClient();
+      if (!client) {
+        throw new Error("Cliente Supabase indisponivel.");
+      }
+
+      const { error } = await client
+        .from("matches")
+        .update({
+          home_score: homeScore,
+          away_score: awayScore,
+          is_closed: true,
+          qualified_side: knockout ? qualifiedSide : null,
+        })
+        .eq("id", matchId);
+      if (error) {
+        throw error;
+      }
+    } else {
+      await requireAppAdmin();
+      await closeAppMatch(matchId, homeScore, awayScore);
     }
 
-    await client
-      .from("matches")
-      .update({
-        home_score: homeScore,
-        away_score: awayScore,
-        is_closed: true,
-        qualified_side: knockout ? qualifiedSide : null,
-      })
-      .eq("id", matchId);
-  } else {
-    await requireAppAdmin();
-    await closeAppMatch(matchId, homeScore, awayScore);
-  }
-
-  if (knockout && qualifiedSide) {
-    await settleQualificationBets({
-      matchId,
-      qualifiedSide,
-      force: true,
-    });
+    if (knockout && qualifiedSide) {
+      await settleQualificationBets({
+        matchId,
+        qualifiedSide,
+        force: true,
+      });
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Falha ao salvar e liquidar o jogo.";
+    redirect(`/admin?result_error=${encodeURIComponent(message)}`);
   }
 
   await notifyFinishedMatchResult({ matchId, homeScore, awayScore }).catch(() => null);
@@ -425,6 +434,7 @@ async function saveOfficialResult(formData: FormData) {
   revalidatePath("/apostas");
   revalidatePath("/historico");
   revalidatePath("/admin");
+  redirect("/admin?result_saved=1");
 }
 
 async function reopenMatch(formData: FormData) {
@@ -599,6 +609,8 @@ export default async function AdminPage({
     score_page?: string;
     password_reset?: string;
     password_error?: string;
+    result_saved?: string;
+    result_error?: string;
   }>;
 }) {
   const viewer = await requireAuthenticatedViewer();
@@ -616,6 +628,8 @@ export default async function AdminPage({
   const csvError = toSafeQueryValue(query.csv_error);
   const passwordReset = toSafeQueryValue(query.password_reset) === "1";
   const passwordError = toSafeQueryValue(query.password_error);
+  const resultSaved = toSafeQueryValue(query.result_saved) === "1";
+  const resultError = toSafeQueryValue(query.result_error);
   const scoreStatus = toScoreStatusFilter(query.score_status);
   const scoreStage = toSafeQueryValue(query.score_stage) || "all";
   const scoreGroup = toSafeQueryValue(query.score_group) || "all";
@@ -737,6 +751,20 @@ export default async function AdminPage({
         {passwordError ? (
           <Surface className="border-red-300/35 bg-red-500/15 p-3">
             <p className="text-sm text-red-100">{passwordError}</p>
+          </Surface>
+        ) : null}
+
+        {resultSaved ? (
+          <Surface className="border-emerald-300/35 bg-emerald-500/15 p-3">
+            <p className="text-sm text-emerald-100">
+              Resultado salvo e apostas liquidadas com sucesso.
+            </p>
+          </Surface>
+        ) : null}
+
+        {resultError ? (
+          <Surface className="border-red-300/35 bg-red-500/15 p-3">
+            <p className="text-sm text-red-100">{resultError}</p>
           </Surface>
         ) : null}
 
@@ -1039,7 +1067,9 @@ export default async function AdminPage({
                       <div />
                     )}
                     <Button type="submit" variant="success" disabled={!viewer.isAdmin}>
-                      Salvar resultado
+                      {match.stage !== "group"
+                        ? "Salvar e liquidar"
+                        : "Salvar resultado"}
                     </Button>
                   </div>
                 </Surface>

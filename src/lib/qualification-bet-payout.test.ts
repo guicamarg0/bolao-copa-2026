@@ -27,6 +27,31 @@ describe("calculateQualificationBetPayouts", () => {
     ]);
   });
 
+  it("settles legacy bets below the current minimum", () => {
+    const result = calculateQualificationBetPayouts(
+      [
+        {
+          id: "legacy-home",
+          selectedSide: "home",
+          stake: 5,
+          createdAt: "2026-06-28T12:00:00.000Z",
+        },
+        {
+          id: "legacy-away",
+          selectedSide: "away",
+          stake: 5,
+          createdAt: "2026-06-28T12:01:00.000Z",
+        },
+      ],
+      "home",
+    );
+
+    expect(result).toEqual([
+      { id: "legacy-home", status: "won", payout: 10 },
+      { id: "legacy-away", status: "lost", payout: 0 },
+    ]);
+  });
+
   it("distributes the losing pool proportionally", () => {
     const result = calculateQualificationBetPayouts(
       [
